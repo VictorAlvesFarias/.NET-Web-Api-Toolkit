@@ -24,10 +24,10 @@ jobs:
         run: dotnet restore
 
       - name: Build solution
-        run: dotnet build ./Dotnet.Web.Basics.sln --configuration Release --no-restore
+        run: dotnet build ./Web.Api.Toolkit.sln --configuration Release --no-restore
 
       - name: Pack all modules
-        run: dotnet pack ./Dotnet.Web.Basics.sln --configuration Release --no-build /p:GeneratePackageOnBuild=true /p:PackageOutputPath=bin/Packages
+        run: dotnet pack ./Web.Api.Toolkit.sln --configuration Release --no-build /p:GeneratePackageOnBuild=true /p:PackageOutputPath=bin/Packages
 
       - name: Publish packages
         run: |
