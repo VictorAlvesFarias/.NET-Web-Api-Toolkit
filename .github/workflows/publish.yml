@@ -1,0 +1,37 @@
+name: Publish NuGet Packages
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build ./DotNet.Template.sln --configuration Release --no-restore
+
+      - name: Pack all modules
+        run: dotnet pack ./DotNet.Template.sln --configuration Release --no-build /p:GeneratePackageOnBuild=true /p:PackageOutputPath=bin/Packages
+
+      - name: Publish packages
+        run: |
+          dotnet nuget push "bin/Packages/*.nupkg" \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
