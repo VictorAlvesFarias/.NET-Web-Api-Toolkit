@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>Helpers.Api</Title>
+    <Title>Web.Api.Toolkit.Helpers.Api</Title>
   </PropertyGroup>
 
   <ItemGroup>

@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>Ws.Application</Title>
+    <Title>Web.Api.Toolkit.Ws.Application</Title>
   </PropertyGroup>
 
   <ItemGroup>

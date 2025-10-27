@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>Helpers.Infraestructure</Title>
+    <Title>Web.Api.Toolkit.Helpers.Infraestructure</Title>
   </PropertyGroup>
 
   <ItemGroup>

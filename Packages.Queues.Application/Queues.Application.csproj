@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>Queues.Application</Title>
+    <Title>Web.Api.Toolkit.Queues.Application</Title>
   </PropertyGroup>
 
 </Project>
