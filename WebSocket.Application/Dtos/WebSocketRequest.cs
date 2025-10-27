@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Packages.Ws.Application.Dtos
+namespace Ws.Application.Dtos
 {
     public class WebSocketRequest
     {
@@ -18,7 +18,7 @@ namespace Packages.Ws.Application.Dtos
                     return;
                 }
 
-                var json = System.Text.Json.JsonSerializer.Serialize(value);
+                var json = JsonSerializer.Serialize(value);
                 using var doc = JsonDocument.Parse(json);
                 _body = doc.RootElement.Clone();
             }
@@ -29,7 +29,7 @@ namespace Packages.Ws.Application.Dtos
             if (_body == null)
                 throw new InvalidOperationException("Body is null");
 
-            return System.Text.Json.JsonSerializer.Deserialize<T>(_body.Value.GetRawText());
+            return JsonSerializer.Deserialize<T>(_body.Value.GetRawText());
         }
     }
 }

@@ -1,13 +1,13 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Packages.Ws.Application.Dtos;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using Ws.Application.Dtos;
 
-namespace Packages.Ws.Application.Workers
+namespace Ws.Application.Workers
 {
     public class WebSocketClientWorker : BackgroundService
     {
@@ -39,9 +39,10 @@ namespace Packages.Ws.Application.Workers
             return new();
         }
 
-        protected virtual TimeSpan GetReconnectDelay() {
+        protected virtual TimeSpan GetReconnectDelay()
+        {
             return _reconnectDelay;
-        } 
+        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -99,12 +100,13 @@ namespace Packages.Ws.Application.Workers
                     await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Service stopping.", cancellationToken);
                 }
             }
-            catch(Exception ex) {
+            catch (Exception ex)
+            {
                 _logger.LogWarning(ex, "Erro na conexão WS, reconectando em {0}s...", GetReconnectDelay().TotalSeconds);
             }
 
             _socket?.Dispose();
-            
+
             await base.StopAsync(cancellationToken);
         }
 
@@ -120,17 +122,17 @@ namespace Packages.Ws.Application.Workers
                 {
                     result = await _socket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Erro na conexão WS, reconectando em {0}s...", GetReconnectDelay().TotalSeconds);
-                    
+
                     break;
                 }
 
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
                     await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed by server.", token);
-                    
+
                     break;
                 }
 

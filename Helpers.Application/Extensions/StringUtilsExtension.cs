@@ -1,4 +1,4 @@
-﻿namespace Packages.Helpers.Application.Extensions
+﻿namespace Helpers.Application.Extensions
 {
     public static class StringUtilsExtension
     {

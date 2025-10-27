@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-
-namespace Packages.Ws.Application.Dtos
+namespace Ws.Application.Dtos
 {
     public class WebSocketInstanceStatistics
     {

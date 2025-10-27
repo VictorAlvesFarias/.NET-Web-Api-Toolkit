@@ -6,10 +6,11 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 
-namespace Packages.Ws.Application.Workers
+namespace Ws.Application.Workers
 {
-    using Packages.Ws.Application.Dtos;
     using System;
+    using Ws.Application.Delegates;
+    using Ws.Application.Dtos;
 
     public class WebSocketWorker : BackgroundService
     {
@@ -356,7 +357,7 @@ namespace Packages.Ws.Application.Workers
             instance.Clients[handleClientAsyncParams.Id] = handleClientAsyncParams;
 
             MarkInviteAsUsed(validateInviteToken.Invite.Token);
-            
+
             while (handleClientAsyncParams.Socket.State == WebSocketState.Open)
             {
                 using var ms = new MemoryStream();
@@ -377,7 +378,7 @@ namespace Packages.Ws.Application.Workers
                     }
 
                     await handleClientAsyncParams.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "closed", CancellationToken.None);
-                    
+
                     break;
                 }
 
@@ -401,7 +402,7 @@ namespace Packages.Ws.Application.Workers
             {
                 TotalInstances = _instances.Count,
                 ActiveInstances = _instances.Values.Count(i => i.IsActive),
-                TotalClients = _instances.SelectMany(e=> e.Value.Clients).Count(),
+                TotalClients = _instances.SelectMany(e => e.Value.Clients).Count(),
                 PendingInvites = _pendingInvites.Count,
                 Instances = _instances.Values.Select(i => new
                 {

@@ -1,17 +1,17 @@
-﻿using Application.Dtos.User;
-using Domain.Entitites;
+﻿using Helpers.Application.Dtos;
+using Identity.Application.Configuration;
+using Identity.Application.Dtos;
+using Identity.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using Packages.Helpers.Application.Dtos;
-using Packages.Identity.Application.Configuration;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 
-namespace Packages.Identity.Application.Services
+namespace Identity.Application.Services
 {
-    public class IdentityService : IIdentityService 
+    public class IdentityService : IIdentityService
     {
         private readonly SignInManager<BaseEntityIdentity> _singInManager;
         private readonly UserManager<BaseEntityIdentity> _userManager;
@@ -74,7 +74,7 @@ namespace Packages.Identity.Application.Services
                 UserName = userData.Username,
                 Email = userData.Email,
                 EmailConfirmed = false,
-                Name = userData.Name    
+                Name = userData.Name
             };
             var createdUser = await _userManager.CreateAsync(user, userData.Password);
             var defaultResponse = new DefaultResponse(createdUser.Succeeded);
@@ -107,7 +107,7 @@ namespace Packages.Identity.Application.Services
 
         public async Task<DefaultResponse> DeleteUser(string identityUserId)
         {
-            var user = _userManager.Users.FirstOrDefault(e=>e.Id == identityUserId);
+            var user = _userManager.Users.FirstOrDefault(e => e.Id == identityUserId);
             var response = new DefaultResponse(user is not null);
 
             if (response.Success)
@@ -119,7 +119,8 @@ namespace Packages.Identity.Application.Services
 
             var result = await _userManager.DeleteAsync(user);
 
-            if (result.Succeeded) { 
+            if (result.Succeeded)
+            {
                 response.AddError(new ErrorMessage("Senha ou Usuario incorretos."));
 
                 return response;

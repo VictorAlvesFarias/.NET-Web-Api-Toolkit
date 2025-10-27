@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Storage;
 
-namespace Packages.Helpers.Infraestructure.Extensions
+namespace Helpers.Infraestructure.Extensions
 {
     public static class IDbContextTransactionExtension
     {

@@ -1,4 +1,4 @@
-﻿namespace Packages.Helpers.Infraestructure.Dtos
+﻿namespace Helpers.Infraestructure.Dtos
 {
     public class BaseGetRequest
     {

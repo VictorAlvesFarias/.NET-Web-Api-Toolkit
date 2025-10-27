@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
-namespace Packages.Queues.Application.Services
+namespace Queues.Application.Services
 {
     public sealed class QueueService<T> : IQueueService<T> where T : class
     {

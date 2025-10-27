@@ -1,8 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Packages.Entity.Infraestructure.Factories;
-using Packages.Entity.Infraestructure.Mediators;
+﻿using Entity.Infraestructure.Factories;
+using Entity.Infraestructure.Mediators;
+using Microsoft.EntityFrameworkCore;
 
-namespace Packages.Entity.Infraestructure.Repositories
+namespace Entity.Infraestructure.Repositories
 {
     public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : class
     {

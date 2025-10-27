@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 
-namespace Packages.Helpers.Application.Dtos
+namespace Helpers.Application.Dtos
 {
     public class ErrorMessage
     {

@@ -1,4 +1,4 @@
-﻿namespace Packages.Entity.Domain.Entities
+﻿namespace Entity.Domain.Entities
 {
     public class BaseEntity
     {

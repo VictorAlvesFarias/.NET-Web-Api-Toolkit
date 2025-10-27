@@ -1,4 +1,4 @@
-﻿namespace Packages.Queues.Application.Services
+﻿namespace Queues.Application.Services
 {
     public interface IQueueService<T> where T : class
     {

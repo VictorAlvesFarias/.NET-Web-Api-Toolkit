@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace Domain.Entitites
+namespace Identity.Domain.Entities
 {
     public class BaseEntityIdentity : IdentityUser
     {
@@ -8,5 +8,5 @@ namespace Domain.Entitites
         public DateTime UpdateDate { get; set; }
         public bool Deleted { get; set; }
         public string Name { get; set; }
-    } 
+    }
 }

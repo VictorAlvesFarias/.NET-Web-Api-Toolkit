@@ -1,4 +1,6 @@
-namespace Packages.Ws.Application.Dtos
+using Ws.Application.Delegates;
+
+namespace Ws.Application.Dtos
 {
     public class WebSocketSubscription
     {

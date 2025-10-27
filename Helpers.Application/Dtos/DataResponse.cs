@@ -1,4 +1,4 @@
-﻿namespace Packages.Helpers.Application.Dtos
+﻿namespace Helpers.Application.Dtos
 {
     public class DataResponse
     {

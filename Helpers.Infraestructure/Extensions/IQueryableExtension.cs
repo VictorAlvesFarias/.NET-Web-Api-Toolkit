@@ -1,6 +1,6 @@
-﻿using Packages.Helpers.Infraestructure.Dtos;
+﻿using Helpers.Application.Dtos;
 
-namespace Packages.Helpers.Infraestructure.Extensions
+namespace Helpers.Infraestructure.Extensions
 {
     public static class IQueryableExtension
     {

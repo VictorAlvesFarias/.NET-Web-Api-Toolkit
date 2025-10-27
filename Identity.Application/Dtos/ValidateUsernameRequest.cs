@@ -1,4 +1,4 @@
-﻿namespace Application.Dtos.User
+﻿namespace Identity.Application.Dtos
 {
     public class ValidateUsernameRequest
     {

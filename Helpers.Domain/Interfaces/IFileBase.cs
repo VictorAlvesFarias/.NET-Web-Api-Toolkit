@@ -1,4 +1,4 @@
-﻿namespace Packages.Helpers.Domain.Interfaces
+﻿namespace Helpers.Domain.Interfaces
 {
     public interface IFileBase
     {

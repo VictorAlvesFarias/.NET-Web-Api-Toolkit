@@ -1,6 +1,6 @@
 using System.Net.WebSockets;
 
-namespace Packages.Ws.Application.Dtos
+namespace Ws.Application.Dtos
 {
     public class WebSocketClient
     {

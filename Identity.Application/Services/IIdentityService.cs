@@ -1,9 +1,9 @@
-﻿using Application.Dtos.User;
-using Packages.Helpers.Application.Dtos;
+﻿using Helpers.Application.Dtos;
+using Identity.Application.Dtos;
 
-namespace Packages.Identity.Application.Services
+namespace Identity.Application.Services
 {
-    public interface IIdentityService 
+    public interface IIdentityService
     {
         Task<BaseResponse<LoginUserResponse>> LoginAsync(LoginUserRequest loginData);
         Task<DefaultResponse> AddUser(CreateUserRequest userData);

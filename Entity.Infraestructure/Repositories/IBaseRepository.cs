@@ -1,4 +1,4 @@
-﻿namespace Packages.Entity.Infraestructure.Repositories
+﻿namespace Entity.Infraestructure.Repositories
 {
     public interface IBaseRepository<TEntity> where TEntity : class
     {

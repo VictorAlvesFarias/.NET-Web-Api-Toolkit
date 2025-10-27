@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 
-namespace Packages.Ws.Application.Dtos
+namespace Ws.Application.Dtos
 {
     public class WebSocketInstance
     {

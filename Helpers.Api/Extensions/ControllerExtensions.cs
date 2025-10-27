@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Helpers.Application.Dtos;
+using Helpers.Domain.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Packages.Helpers.Application.Dtos;
-using Packages.Helpers.Domain.Interfaces;
 
-namespace Packages.Helpers.Api.Extensions
+namespace Helpers.Api.Extensions
 {
     public static class ControllerExtensions
     {
