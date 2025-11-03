@@ -1,4 +1,4 @@
-﻿namespace Entity.Infraestructure.Repositories
+﻿namespace Web.Api.Toolkit.Web.Api.Toolkit.Entity.Infraestructure.Repositories
 {
     public interface IBaseRepository<TEntity> where TEntity : class
     {

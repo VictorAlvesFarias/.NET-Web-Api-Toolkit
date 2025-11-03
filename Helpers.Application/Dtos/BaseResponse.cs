@@ -1,4 +1,4 @@
-﻿namespace Helpers.Application.Dtos
+﻿namespace Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Application.Dtos
 {
     public class BaseResponse<T> : DataResponse
     {

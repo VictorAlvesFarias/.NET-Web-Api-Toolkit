@@ -1,4 +1,4 @@
-﻿namespace Identity.Application.Dtos
+﻿namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Dtos
 {
     public class ValidateEmailRequest
     {

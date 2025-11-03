@@ -1,4 +1,4 @@
-﻿namespace Helpers.Application.Extensions
+﻿namespace Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Application.Extensions
 {
     public static class StringUtilsExtension
     {

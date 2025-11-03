@@ -1,6 +1,6 @@
-﻿using Entity.Domain.Entities;
+﻿using Web.Api.Toolkit.Web.Api.Toolkit.Entity.Domain.Entities;
 
-namespace Identity.Domain.Entities
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Domain.Entities
 {
     public class BaseUserOwnedEntity : BaseEntity
     {

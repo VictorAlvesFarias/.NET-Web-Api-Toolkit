@@ -3,25 +3,25 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Entity.Domain", "Entity.Domain\Entity.Domain.csproj", "{E834A143-6018-48B3-89FC-19E92665DCC5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Entity.Domain", "Entity.Domain\Web.Api.Toolkit.Entity.Domain.csproj", "{E834A143-6018-48B3-89FC-19E92665DCC5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Entity.Infraestructure", "Entity.Infraestructure\Entity.Infraestructure.csproj", "{892A7B93-7787-4A17-9B34-1A9211D50A5E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Entity.Infraestructure", "Entity.Infraestructure\Web.Api.Toolkit.Entity.Infraestructure.csproj", "{892A7B93-7787-4A17-9B34-1A9211D50A5E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helpers.Api", "Helpers.Api\Helpers.Api.csproj", "{91C5929E-5A4F-4182-BEBE-DDF499552253}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Helpers.Api", "Helpers.Api\Web.Api.Toolkit.Helpers.Api.csproj", "{91C5929E-5A4F-4182-BEBE-DDF499552253}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helpers.Application", "Helpers.Application\Helpers.Application.csproj", "{8AF1C3FC-D6A8-4031-86A2-4556C070AA8E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Helpers.Application", "Helpers.Application\Web.Api.Toolkit.Helpers.Application.csproj", "{8AF1C3FC-D6A8-4031-86A2-4556C070AA8E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helpers.Domain", "Helpers.Domain\Helpers.Domain.csproj", "{B7FE4DBC-5E1D-44B0-89BB-C0517FFAE0A6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Helpers.Domain", "Helpers.Domain\Web.Api.Toolkit.Helpers.Domain.csproj", "{B7FE4DBC-5E1D-44B0-89BB-C0517FFAE0A6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helpers.Infraestructure", "Helpers.Infraestructure\Helpers.Infraestructure.csproj", "{69DF776A-BD57-4EFC-A076-696A3046C579}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Helpers.Infraestructure", "Helpers.Infraestructure\Web.Api.Toolkit.Helpers.Infraestructure.csproj", "{69DF776A-BD57-4EFC-A076-696A3046C579}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Identity.Application", "Identity.Application\Identity.Application.csproj", "{B313EBC2-8E03-40C5-BA51-BFE5C5FF5870}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Identity.Application", "Identity.Application\Web.Api.Toolkit.Identity.Application.csproj", "{B313EBC2-8E03-40C5-BA51-BFE5C5FF5870}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Identity.Domain", "Identity.Domain\Identity.Domain.csproj", "{9DFBFE43-8836-436E-A111-3594EB85D3C8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Identity.Domain", "Identity.Domain\Web.Api.Toolkit.Identity.Domain.csproj", "{9DFBFE43-8836-436E-A111-3594EB85D3C8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Queues.Application", "Queues.Application\Queues.Application.csproj", "{062B5306-4689-4D01-AA28-5BBC8E126D0A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Queues.Application", "Queues.Application\Web.Api.Toolkit.Queues.Application.csproj", "{062B5306-4689-4D01-AA28-5BBC8E126D0A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ws.Application", "WebSocket.Application\Ws.Application.csproj", "{FDFD973C-8905-505F-6428-B710AD430CE1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Ws.Application", "WebSocket.Application\Web.Api.Toolkit.Ws.Application.csproj", "{FDFD973C-8905-505F-6428-B710AD430CE1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

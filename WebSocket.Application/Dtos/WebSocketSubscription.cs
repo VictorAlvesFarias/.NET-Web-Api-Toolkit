@@ -1,6 +1,6 @@
-using Ws.Application.Delegates;
+using Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Delegates;
 
-namespace Ws.Application.Dtos
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Dtos
 {
     public class WebSocketSubscription
     {

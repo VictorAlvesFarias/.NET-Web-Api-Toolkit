@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Ws.Application.Dtos
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Dtos
 {
     public class WebSocketRequest
     {

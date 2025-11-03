@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace Identity.Domain.Entities
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Domain.Entities
 {
     public class BaseEntityIdentity : IdentityUser
     {

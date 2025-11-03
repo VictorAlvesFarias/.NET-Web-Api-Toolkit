@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Identity.Application.Extensions
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Extensions
 {
     public static class IdentityServiceCollectionExtensions
     {

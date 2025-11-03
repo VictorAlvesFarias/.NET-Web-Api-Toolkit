@@ -1,4 +1,4 @@
-﻿namespace Queues.Application.Services
+﻿namespace Web.Api.Toolkit.Web.Api.Toolkit.Queues.Application.Services
 {
     public interface IQueueService<T> where T : class
     {

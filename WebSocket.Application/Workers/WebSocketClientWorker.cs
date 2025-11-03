@@ -5,9 +5,9 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using Ws.Application.Dtos;
+using Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Dtos;
 
-namespace Ws.Application.Workers
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Workers
 {
     public class WebSocketClientWorker : BackgroundService
     {

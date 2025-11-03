@@ -5,15 +5,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>Web.Api.Toolkit.Helpers.Application</Title>
+    <Title>Web.Api.Toolkit.Helpers.Api</Title>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Packages.Helpers.Infraestructure\Helpers.Infraestructure.csproj" />
+    <ProjectReference Include="..\Helpers.Application\Web.Api.Toolkit.Helpers.Application.csproj" />
+    <ProjectReference Include="..\Helpers.Domain\Web.Api.Toolkit.Helpers.Domain.csproj" />
   </ItemGroup>
-
+	
 </Project>

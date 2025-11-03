@@ -1,15 +1,15 @@
-﻿using Helpers.Application.Dtos;
-using Identity.Application.Configuration;
-using Identity.Application.Dtos;
-using Identity.Domain.Entities;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
+using Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Application.Dtos;
+using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Configuration;
+using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Dtos;
+using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Domain.Entities;
 
-namespace Identity.Application.Services
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Services
 {
     public class IdentityService : IIdentityService
     {

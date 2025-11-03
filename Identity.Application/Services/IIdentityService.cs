@@ -1,7 +1,7 @@
-﻿using Helpers.Application.Dtos;
-using Identity.Application.Dtos;
+﻿using Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Application.Dtos;
+using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Dtos;
 
-namespace Identity.Application.Services
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Services
 {
     public interface IIdentityService
     {

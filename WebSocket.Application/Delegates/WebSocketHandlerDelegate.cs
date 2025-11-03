@@ -1,7 +1,7 @@
 using System.Net.WebSockets;
-using Ws.Application.Dtos;
+using Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Dtos;
 
-namespace Ws.Application.Delegates
+namespace Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Delegates
 {
     public delegate Task WebSocketHandler(
         WebSocket ws,
