@@ -8,5 +8,6 @@
     <RepositoryUrl>https://github.com/VictorAlvesFarias/.NET-Web-Basics</RepositoryUrl>
     <PackageOutputPath>$(SolutionDir)\bin\Packages</PackageOutputPath>
     <Version>1.0.1</Version>
+    <RootNamespace>Web.Api.Toolkit.$(MSBuildProjectName)</RootNamespace>
   </PropertyGroup>
 </Project>
