@@ -1,4 +1,4 @@
-﻿namespace Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Infraestructure.Dtos
+﻿namespace Web.Api.Toolkit.Helpers.Infraestructure.Dtos
 {
     public class BaseGetRequest
     {

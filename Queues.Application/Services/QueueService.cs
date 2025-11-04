@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Queues.Application.Services
+namespace Web.Api.Toolkit.Queues.Application.Services
 {
     public sealed class QueueService<T> : IQueueService<T> where T : class
     {

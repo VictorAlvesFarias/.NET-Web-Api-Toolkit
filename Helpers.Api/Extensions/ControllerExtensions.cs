@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Application.Dtos;
-using Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Domain.Interfaces;
+using Web.Api.Toolkit.Helpers.Application.Dtos;
+using Web.Api.Toolkit.Helpers.Domain.Interfaces;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Api.Extensions
+namespace Web.Api.Toolkit.Helpers.Api.Extensions
 {
     public static class ControllerExtensions
     {

@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Entity.Infraestructure.Factories
+namespace Web.Api.Toolkit.Entity.Infraestructure.Factories
 {
     public interface IDatabaseContextFactory
     {

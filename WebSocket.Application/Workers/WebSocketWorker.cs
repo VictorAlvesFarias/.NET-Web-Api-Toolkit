@@ -6,10 +6,10 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Workers
+namespace Web.Api.Toolkit.Ws.Application.Workers
 {
-    using global::Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Delegates;
-    using global::Web.Api.Toolkit.Web.Api.Toolkit.Ws.Application.Dtos;
+    using global::Web.Api.Toolkit.Ws.Application.Delegates;
+    using global::Web.Api.Toolkit.Ws.Application.Dtos;
     using System;
 
     public class WebSocketWorker : BackgroundService

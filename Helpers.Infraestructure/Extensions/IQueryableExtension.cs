@@ -1,6 +1,6 @@
-﻿using Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Infraestructure.Dtos;
+﻿using Web.Api.Toolkit.Helpers.Infraestructure.Dtos;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Infraestructure.Extensions
+namespace Web.Api.Toolkit.Helpers.Infraestructure.Extensions
 {
     public static class IQueryableExtension
     {

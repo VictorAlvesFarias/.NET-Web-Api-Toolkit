@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Entity.Infraestructure.Mediators
+namespace Web.Api.Toolkit.Entity.Infraestructure.Mediators
 {
     public interface IDatabaseContextMediator<TEntity> where TEntity : class
     {

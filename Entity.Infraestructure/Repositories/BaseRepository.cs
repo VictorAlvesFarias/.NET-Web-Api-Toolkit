@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Web.Api.Toolkit.Web.Api.Toolkit.Entity.Infraestructure.Factories;
-using Web.Api.Toolkit.Web.Api.Toolkit.Entity.Infraestructure.Mediators;
+using Web.Api.Toolkit.Entity.Infraestructure.Factories;
+using Web.Api.Toolkit.Entity.Infraestructure.Mediators;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Entity.Infraestructure.Repositories
+namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
 {
     public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : class
     {

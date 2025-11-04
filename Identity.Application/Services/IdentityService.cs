@@ -4,12 +4,12 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
-using Web.Api.Toolkit.Web.Api.Toolkit.Helpers.Application.Dtos;
-using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Configuration;
-using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Dtos;
-using Web.Api.Toolkit.Web.Api.Toolkit.Identity.Domain.Entities;
+using Web.Api.Toolkit.Helpers.Application.Dtos;
+using Web.Api.Toolkit.Identity.Application.Configuration;
+using Web.Api.Toolkit.Identity.Application.Dtos;
+using Web.Api.Toolkit.Identity.Domain.Entities;
 
-namespace Web.Api.Toolkit.Web.Api.Toolkit.Identity.Application.Services
+namespace Web.Api.Toolkit.Identity.Application.Services
 {
     public class IdentityService : IIdentityService
     {
