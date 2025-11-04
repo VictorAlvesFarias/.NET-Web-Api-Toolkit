@@ -1,4 +1,4 @@
-﻿namespace   Entity.Domain.Entities
+﻿namespace Web.Api.Toolkit.Entity.Domain.Entities
 {
     public class BaseEntity
     {
