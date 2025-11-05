@@ -1,17 +1,17 @@
-﻿using Web.Api.Toolkit.Helpers.Application.Dtos;
+﻿using Microsoft.AspNetCore.Identity;
+using Web.Api.Toolkit.Helpers.Application.Dtos;
 using Web.Api.Toolkit.Identity.Application.Dtos;
+using Web.Api.Toolkit.Identity.Domain.Entities;
 
 namespace Web.Api.Toolkit.Identity.Application.Services
 {
-    public interface IIdentityService
+    public interface IIdentityUtilsService<T> where T : IdentityUser
     {
         Task<BaseResponse<LoginUserResponse>> LoginAsync(LoginUserRequest loginData);
-        Task<DefaultResponse> AddUser(CreateUserRequest userData);
         Task<DefaultResponse> DeleteSignedUser(LoginUserRequest email);
-        Task<DefaultResponse> PutUser(PutUserRequest userData);
         Task<DefaultResponse> ValidateUsernameAsync(string email);
         Task<DefaultResponse> ValidateEmailAsync(string email);
         Task<DefaultResponse> ChangePasswordAsync(ChangePasswordRequest changePasswordData);
-        Task<DefaultResponse> DeleteUser(string identityUserId);
+        Task<BaseResponse<string>> CreateToken(T user);
     }
 }
