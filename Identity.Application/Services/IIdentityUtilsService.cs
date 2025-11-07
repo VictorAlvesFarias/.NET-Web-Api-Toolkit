@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Web.Api.Toolkit.Helpers.Application.Dtos;
 using Web.Api.Toolkit.Identity.Application.Dtos;
-using Web.Api.Toolkit.Identity.Domain.Entities;
 
 namespace Web.Api.Toolkit.Identity.Application.Services
 {

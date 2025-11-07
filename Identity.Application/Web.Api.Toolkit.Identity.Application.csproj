@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helpers.Application\Web.Api.Toolkit.Helpers.Application.csproj" />
-    <ProjectReference Include="..\Identity.Domain\Web.Api.Toolkit.Identity.Domain.csproj" />
   </ItemGroup>
 
 </Project>

@@ -8,7 +8,6 @@ using Web.Api.Toolkit.Helpers.Application.Dtos;
 using Web.Api.Toolkit.Helpers.Application.Extensions;
 using Web.Api.Toolkit.Identity.Application.Configuration;
 using Web.Api.Toolkit.Identity.Application.Dtos;
-using Web.Api.Toolkit.Identity.Domain.Entities;
 
 namespace Web.Api.Toolkit.Identity.Application.Services
 {
