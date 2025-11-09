@@ -2,7 +2,7 @@
 {
     public class BaseResponse<T> : DataResponse
     {
-        public BaseResponse(bool success = false) => Success = success;
+        public BaseResponse(bool success = true) => Success = success;
         public T? Data { get; set; }
     }
 }
