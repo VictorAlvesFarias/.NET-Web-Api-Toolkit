@@ -35,35 +35,6 @@ namespace Web.Api.Toolkit.Identity.Application.Extensions
                 return await userManager.FindByNameAsync(accessKey);
         }
 
-        public static async Task<bool> EmailAvaiable<T>(this UserManager<T> userManager, string email) where T : IdentityUser
-        {
-            var user = await userManager.FindByEmailAsync(email);
-
-            return user != null;
-        }
-
-        public static async Task<bool> UsernameAvaiable<T>(this UserManager<T> userManager, string username) where T : IdentityUser
-        {
-            var user = await userManager.FindByNameAsync(username);
-
-            return user != null;
-        }
-
-        public static async Task<bool> UserAvaiable<T>(this UserManager<T> userManager, string accessKey) where T : IdentityUser
-        {
-            T user = null;
-
-            if (accessKey.IsEmail()) { 
-                user = await userManager.FindByEmailAsync(accessKey);
-            }
-            else
-            {
-                user = await userManager.FindByNameAsync(accessKey);
-            }
-
-            return user != null;
-        }
-
         public static async Task<BaseResponse<string>> CreateDefaultToken<T>(this UserManager<T> userManager, T user, IOptions<JwtOptions> jwtOptions) where T : IdentityUser
         {
             var claims = userManager.GetDefaultClaims(user);
