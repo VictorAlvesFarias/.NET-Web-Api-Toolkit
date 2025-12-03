@@ -1,0 +1,20 @@
+using System;
+
+namespace Web.Api.Toolkit.Ws.Application.Attributes
+{
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+    public sealed class WsActionAttribute : Attribute
+    {
+        public WsActionAttribute(string @event)
+        {
+            if (string.IsNullOrWhiteSpace(@event))
+                throw new ArgumentException("The event name is required.", nameof(@event));
+
+            Event = @event;
+        }
+
+        public string Event { get; }
+    }
+}
+
+
