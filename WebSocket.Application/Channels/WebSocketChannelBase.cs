@@ -4,11 +4,7 @@ using Web.Api.Toolkit.Ws.Application.Workers;
 
 namespace Web.Api.Toolkit.Ws.Application.Channels
 {
-    /// <summary>
-    /// Base class for WebSocket channels without worker association.
-    /// For channels associated with a specific worker, use WebSocketChannelBase&lt;TWorker&gt;.
-    /// </summary>
-    public abstract class WebSocketChannelBase
+    public abstract class WebSocketChannelBase<TWorker> where TWorker : WebSocketClientWorker
     {
         private WebSocketRequestContext? _context;
 
@@ -28,16 +24,4 @@ namespace Web.Api.Toolkit.Ws.Application.Channels
             _context = context;
         }
     }
-
-    /// <summary>
-    /// Base class for WebSocket channels associated with a specific WebSocketClientWorker type.
-    /// This allows multiple WebSocket workers to have their own set of channels.
-    /// </summary>
-    /// <typeparam name="TWorker">The type of WebSocketClientWorker this channel is associated with.</typeparam>
-    public abstract class WebSocketChannelBase<TWorker> : WebSocketChannelBase
-        where TWorker : WebSocketClientWorker
-    {
-    }
 }
-
-

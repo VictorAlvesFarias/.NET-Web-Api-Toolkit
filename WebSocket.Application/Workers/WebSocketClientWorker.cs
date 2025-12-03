@@ -30,7 +30,8 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         public WebSocketClientWorker(
             ILogger<WebSocketClientWorker> logger,
             IServiceScopeFactory scopeFactory,
-            TimeSpan? reconnectDelay = null)
+            TimeSpan? reconnectDelay = null
+        )
         {
             _logger = logger;
             _handlers = new ConcurrentDictionary<string, Func<WebSocketClientRequest, CancellationToken, Task>>();
@@ -43,24 +44,23 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             };
         }
 
-        protected virtual string GetUrl()
+        public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            return "ws://localhost:5000/ws";
-        }
+            try
+            {
+                if (_socket != null && _socket.State == WebSocketState.Open)
+                {
+                    await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Service stopping.", cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Erro na conexão WS, reconectando em {0}s...", GetReconnectDelay().TotalSeconds);
+            }
 
-        protected virtual Dictionary<string, string> GetHeaders()
-        {
-            return new();
-        }
+            _socket?.Dispose();
 
-        protected virtual CookieContainer GetCookies()
-        {
-            return new();
-        }
-
-        protected virtual TimeSpan GetReconnectDelay()
-        {
-            return _reconnectDelay;
+            await base.StopAsync(cancellationToken);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -102,6 +102,56 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             }
         }
 
+        protected virtual string GetUrl()
+        {
+            return "ws://localhost:5000/ws";
+        }
+
+        protected virtual Dictionary<string, string> GetHeaders()
+        {
+            return new();
+        }
+
+        protected virtual CookieContainer GetCookies()
+        {
+            return new();
+        }
+
+        protected virtual TimeSpan GetReconnectDelay()
+        {
+            return _reconnectDelay;
+        }
+
+        protected virtual void ProcessMessage(string message, CancellationToken token)
+        {
+            try
+            {
+                var req = JsonSerializer.Deserialize<WebSocketClientRequest>(message, _serializerOptions);
+                if (req == null || string.IsNullOrWhiteSpace(req.Event))
+                    return;
+
+                if (_handlers.TryGetValue(req.Event, out var handler))
+                    _ = Task.Run(() => handler(req, token), token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error message proccesing.");
+            }
+        }
+
+        public virtual async Task SendAsync<T>(T payload, CancellationToken token = default)
+        {
+            if (_socket.State != WebSocketState.Open)
+            {
+                return;
+            }
+
+            var json = JsonSerializer.Serialize(payload);
+            var bytes = Encoding.UTF8.GetBytes(json);
+
+            await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token);
+        }
+
         public void Subscribe(string eventType, Func<WebSocketClientRequest, CancellationToken, Task> handler)
         {
             Subscribe(eventType, (_, request, token) => handler(request, token));
@@ -122,18 +172,16 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             };
         }
 
-        public void RegisterChannel<TChannel>() where TChannel : WebSocketChannelBase
-        {
-            RegisterChannel(typeof(TChannel));
-        }
-
         public void RegisterChannel(Type channelType)
         {
             if (channelType == null)
                 throw new ArgumentNullException(nameof(channelType));
 
-            if (!typeof(WebSocketChannelBase).IsAssignableFrom(channelType))
-                throw new ArgumentException($"Channel type must inherit from {nameof(WebSocketChannelBase)}", nameof(channelType));
+            var thisWorkerType = GetType();
+            var expectedBaseType = typeof(WebSocketChannelBase<>).MakeGenericType(thisWorkerType);
+            
+            if (!expectedBaseType.IsAssignableFrom(channelType))
+                throw new ArgumentException($"Channel type must inherit from {expectedBaseType.FullName}<{thisWorkerType.Name}>", nameof(channelType));
 
             var methods = channelType
                 .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -162,11 +210,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             }
         }
 
-        /// <summary>
-        /// Registers all WebSocket channels associated with this worker type.
-        /// Automatically discovers channels that inherit from WebSocketChannelBase&lt;TWorker&gt; where TWorker is this worker's type,
-        /// or channels that inherit from WebSocketChannelBase (for backward compatibility).
-        /// </summary>
         public void RegisterChannels()
         {
             var thisWorkerType = GetType();
@@ -189,29 +232,8 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     if (t.IsAbstract || t.IsInterface || !t.IsClass)
                         return false;
 
-                    // Register channels specifically associated with this worker type
-                    if (baseChannelTypeForThisWorker.IsAssignableFrom(t))
-                        return true;
-
-                    // For backward compatibility: register channels without worker association
-                    // only if they inherit directly from WebSocketChannelBase (not WebSocketChannelBase<>)
-                    if (typeof(WebSocketChannelBase).IsAssignableFrom(t))
-                    {
-                        var baseType = t.BaseType;
-                        while (baseType != null && baseType != typeof(object))
-                        {
-                            if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(WebSocketChannelBase<>))
-                            {
-                                // This channel is associated with a different worker, skip it
-                                return false;
-                            }
-                            baseType = baseType.BaseType;
-                        }
-                        // This is a channel without worker association (direct inheritance from WebSocketChannelBase)
-                        return true;
-                    }
-
-                    return false;
+                    // Register only channels specifically associated with this worker type
+                    return baseChannelTypeForThisWorker.IsAssignableFrom(t);
                 })
                 .Distinct()
                 .ToList();
@@ -227,72 +249,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     _logger.LogWarning(ex, "Failed to register channel {ChannelType}", channelType.FullName);
                 }
             }
-        }
-
-        /// <summary>
-        /// Registers all WebSocket channels found in the specified assemblies.
-        /// </summary>
-        /// <param name="assemblies">The assemblies to scan for channels.</param>
-        public void RegisterChannels(params Assembly[] assemblies)
-        {
-            if (assemblies == null || assemblies.Length == 0)
-            {
-                RegisterChannels();
-                return;
-            }
-
-            var channelTypes = assemblies
-                .SelectMany(a =>
-                {
-                    try
-                    {
-                        return a.GetTypes();
-                    }
-                    catch (ReflectionTypeLoadException)
-                    {
-                        return Array.Empty<Type>();
-                    }
-                })
-                .Where(t => typeof(WebSocketChannelBase).IsAssignableFrom(t) 
-                    && !t.IsAbstract 
-                    && !t.IsInterface
-                    && t.IsClass)
-                .Distinct()
-                .ToList();
-
-            foreach (var channelType in channelTypes)
-            {
-                RegisterChannel(channelType);
-            }
-        }
-
-        public async Task SendAsync<T>(T payload, CancellationToken token = default)
-        {
-            if (_socket.State != WebSocketState.Open)
-                return;
-
-            var json = JsonSerializer.Serialize(payload);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token);
-        }
-
-        public override async Task StopAsync(CancellationToken cancellationToken)
-        {
-            try
-            {
-                if (_socket != null && _socket.State == WebSocketState.Open)
-                {
-                    await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Service stopping.", cancellationToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Erro na conexão WS, reconectando em {0}s...", GetReconnectDelay().TotalSeconds);
-            }
-
-            _socket?.Dispose();
-
-            await base.StopAsync(cancellationToken);
         }
 
         private async Task ReceiveLoop(CancellationToken token)
@@ -329,35 +285,17 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             throw new Exception("WebSocket connection is ended.");
         }
 
-        private void ProcessMessage(string message, CancellationToken token)
+        private async Task InvokeChannel(WebSocketChannelActionDescriptor descriptor, IServiceProvider services, WebSocketClientRequest request, CancellationToken token)
         {
-            try
-            {
-                var req = JsonSerializer.Deserialize<WebSocketClientRequest>(message, _serializerOptions);
-                if (req == null || string.IsNullOrWhiteSpace(req.Event))
-                    return;
-
-                if (_handlers.TryGetValue(req.Event, out var handler))
-                    _ = Task.Run(() => handler(req, token), token);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error message proccesing.");
-            }
-        }
-        private async Task InvokeChannel(
-            WebSocketChannelActionDescriptor descriptor,
-            IServiceProvider services,
-            WebSocketClientRequest request,
-            CancellationToken token)
-        {
-            var channel = (WebSocketChannelBase)services.GetRequiredService(descriptor.ChannelType);
+            var channel = services.GetRequiredService(descriptor.ChannelType);
             var context = new WebSocketRequestContext(request, services, token, this);
-            channel.SetContext(context);
+            var setContextMethod = channel.GetType().GetMethod("SetContext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            setContextMethod?.Invoke(channel, new object[] { context });
 
             var args = BuildArguments(descriptor, context);
-
             var result = descriptor.MethodInfo.Invoke(channel, args);
+
             if (result is Task task)
             {
                 await task;
