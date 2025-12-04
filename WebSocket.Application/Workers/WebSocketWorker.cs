@@ -36,7 +36,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             // Removido: _subscriptions = new ConcurrentDictionary<string, List<WebSocketSubscription>>();
             _instances = new ConcurrentDictionary<string, WebSocketInstance>();
             _pendingInvites = new ConcurrentDictionary<string, ConnectionInvite>();
-            _basePort = ExtractPortFromPrefix(prefix);
+            _basePort =  new Uri(prefix).Port;
             _maxConnectionsPerInstance = maxConnectionsPerInstance;
             _inviteExpirationMinutes = inviteExpirationMinutes;
             _baseUrl = baseUrl;
@@ -45,8 +45,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             _logger.LogInformation("WebSocketWorker constructed: prefix={Prefix}, basePort={BasePort}, baseUrl={BaseUrl}, maxConnectionsPerInstance={MaxConnections}, inviteExpirationMinutes={InviteMinutes}",
                 prefix, _basePort, _baseUrl, _maxConnectionsPerInstance, _inviteExpirationMinutes);
         }
-
-        #region BackgroundService Methods
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -66,9 +64,148 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        #endregion
+        protected virtual ValidateInviteTokenResult ValidateInviteToken(string token)
+        {
+            // Lógica de validação de convite (mantida)
+            var invitereq = GetAvailableInstance(Guid.Parse(token));
 
-        #region Service Methods
+            if (!_pendingInvites.TryGetValue(invitereq.Token, out var invite))
+            {
+                _logger.LogWarning("ValidateInviteToken: token not found: {Token}", token);
+                return new ValidateInviteTokenResult(false, "Token not found.", null);
+            }
+
+            if (invite.IsUsed)
+            {
+                _logger.LogWarning("ValidateInviteToken: token already used: {Token}", token);
+                return new ValidateInviteTokenResult(false, $"Token already used: \"{token}\".", null);
+            }
+
+            if (DateTime.UtcNow > invite.ExpiresAt)
+            {
+                _pendingInvites.TryRemove(token, out _);
+                _logger.LogWarning("ValidateInviteToken: token expired and removed: {Token}", token);
+
+                return new ValidateInviteTokenResult(false, $"Token expired: \"{token}\".", null);
+            }
+
+            _logger.LogDebug("ValidateInviteToken: token valid: {Token}", token);
+            return new ValidateInviteTokenResult(true, null, invite);
+        }
+
+        protected virtual WebSocketAuthResponse Authentication(WebSocket ws, Dictionary<string, string> headers, Dictionary<string, string> cookies)
+        {
+            // Lógica de autenticação (mantida)
+            var token = "";
+
+            if (headers.ContainsKey("id"))
+            {
+                token = headers["id"];
+                _logger.LogDebug("Authentication: found token in Authorization header");
+            }
+
+            if (cookies.ContainsKey("id"))
+            {
+                token = cookies["id"];
+                _logger.LogDebug("Authentication: found token in id cookie");
+            }
+
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("Authentication: failed to find token in headers or cookies. HeadersContainsAuthorization={HasAuth}, CookiesContainId={HasId}",
+                    headers.ContainsKey("Authorization"),
+                    cookies.ContainsKey("id"));
+
+                return new WebSocketAuthResponse()
+                {
+                    Success = false,
+                    Message = "Authentication error: No token found",
+                    Token = token
+                };
+            }
+
+            _logger.LogInformation("Authentication: successful with token from {Source}",
+
+            headers.ContainsKey("Authorization") ? "Authorization header" : "id cookie");
+
+            return new WebSocketAuthResponse()
+            {
+                Success = true,
+                Message = "Authentication successful",
+                Token = token
+            };
+
+        }
+
+        public virtual async Task SendAsync(Guid clientId, WebSocketRequest payload)
+        {
+            WebSocketClient client = null;
+            WebSocketInstance instance = null;
+
+            foreach (var inst in _instances.Values.Where(i => i.IsActive))
+            {
+                if (inst.Clients.TryGetValue(clientId, out var foundClient))
+                {
+                    client = foundClient;
+                    instance = inst;
+
+                    break;
+                }
+            }
+
+            if (client == null)
+            {
+                _logger.LogWarning("SendAsync: client {ClientId} not found in any active instance.", clientId);
+                return;
+            }
+
+            if (client.Socket.State != WebSocketState.Open)
+            {
+                _logger.LogWarning("SendAsync: client {ClientId} socket is not open. CurrentState={State}", clientId, client.Socket.State);
+                return;
+            }
+
+            var json = JsonSerializer.Serialize(payload);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            var seg = new ArraySegment<byte>(bytes);
+
+            try
+            {
+                await client.Socket.SendAsync(seg, WebSocketMessageType.Text, true, CancellationToken.None);
+                _logger.LogDebug("SendAsync: message sent to client {ClientId}. Event={Event}", clientId, payload?.Event);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SendAsync: error sending WebSocket message to client {ClientId}. Event={Event}", clientId, payload?.Event);
+            }
+        }
+
+        public virtual async Task BroadcastAsync(WebSocketRequest payload, Func<WebSocketClient, WebSocketRequest, bool>? q = null)
+        {
+            foreach (var instance in _instances.Values.Where(i => i.IsActive))
+            {
+                foreach (var client in instance.Clients.Values)
+                {
+                    if (q != null && !q(client, payload))
+                        continue;
+
+                    if (client.Socket.State != WebSocketState.Open)
+                        continue;
+
+                    try
+                    {
+                        var json = JsonSerializer.Serialize(payload);
+                        var bytes = Encoding.UTF8.GetBytes(json);
+                        var seg = new ArraySegment<byte>(bytes);
+                        await client.Socket.SendAsync(seg, WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "BroadcastAsync: error sending WebSocket message to client {ClientId}. Event={Event}", client.Id, payload?.Event);
+                    }
+                }
+            }
+        }
 
         public ConcurrentDictionary<Guid, WebSocketClient> GetClients()
         {
@@ -123,85 +260,24 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             };
         }
 
-        public async Task SendAsync(Guid clientId, WebSocketRequest payload)
+        public WebSocketInstanceStatistics GetStatistics()
         {
-            WebSocketClient client = null;
-            WebSocketInstance instance = null;
-
-            foreach (var inst in _instances.Values.Where(i => i.IsActive))
+            return new WebSocketInstanceStatistics
             {
-                if (inst.Clients.TryGetValue(clientId, out var foundClient))
+                TotalInstances = _instances.Count,
+                ActiveInstances = _instances.Values.Count(i => i.IsActive),
+                TotalClients = _instances.SelectMany(e => e.Value.Clients).Count(),
+                PendingInvites = _pendingInvites.Count,
+                Instances = _instances.Values.Select(i => new
                 {
-                    client = foundClient;
-                    instance = inst;
-
-                    break;
-                }
-            }
-
-            if (client == null)
-            {
-                _logger.LogWarning("SendAsync: client {ClientId} not found in any active instance.", clientId);
-                return;
-            }
-
-            if (client.Socket.State != WebSocketState.Open)
-            {
-                _logger.LogWarning("SendAsync: client {ClientId} socket is not open. CurrentState={State}", clientId, client.Socket.State);
-                return;
-            }
-
-            var json = JsonSerializer.Serialize(payload);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            var seg = new ArraySegment<byte>(bytes);
-
-            try
-            {
-                await client.Socket.SendAsync(seg, WebSocketMessageType.Text, true, CancellationToken.None);
-                _logger.LogDebug("SendAsync: message sent to client {ClientId}. Event={Event}", clientId, payload?.Event);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "SendAsync: error sending WebSocket message to client {ClientId}. Event={Event}", clientId, payload?.Event);
-            }
-        }
-
-        public async Task BroadcastAsync(WebSocketRequest payload, Func<WebSocketClient, WebSocketRequest, bool>? q = null)
-        {
-            foreach (var instance in _instances.Values.Where(i => i.IsActive))
-            {
-                foreach (var client in instance.Clients.Values)
-                {
-                    if (q != null && !q(client, payload))
-                        continue;
-
-                    if (client.Socket.State != WebSocketState.Open)
-                        continue;
-
-                    try
-                    {
-                        var json = JsonSerializer.Serialize(payload);
-                        var bytes = Encoding.UTF8.GetBytes(json);
-                        var seg = new ArraySegment<byte>(bytes);
-                        await client.Socket.SendAsync(seg, WebSocketMessageType.Text, true, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "BroadcastAsync: error sending WebSocket message to client {ClientId}. Event={Event}", client.Id, payload?.Event);
-                    }
-                }
-            }
-        }
-
-        #endregion
-
-        #region Orquestration Methods
-
-        private int ExtractPortFromPrefix(string prefix)
-        {
-            var uri = new Uri(prefix);
-
-            return uri.Port;
+                    i.InstanceId,
+                    i.Port,
+                    CurrentConnections = i.Clients.Count,
+                    i.MaxConnections,
+                    i.IsActive,
+                    i.CreatedAt
+                })
+            };
         }
 
         private WebSocketInstance CreateNewInstance()
@@ -213,6 +289,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             _logger.LogInformation("Creating new WebSocket instance {InstanceId} on port {Port} with url {Url}", instanceId, port, url);
 
             var listener = new HttpListener();
+
             listener.Prefixes.Add($"http://+:{port}/ws/");
 
             var instance = new WebSocketInstance
@@ -333,7 +410,10 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             instance.Clients[handleClientAsyncParams.Id] = handleClientAsyncParams;
 
-            MarkInviteAsUsed(validateInviteToken.Invite.Token);
+            if (_pendingInvites.TryGetValue(validateInviteToken.Invite.Token, out var invite))
+            {
+                invite.IsUsed = true;
+            }
 
             while (handleClientAsyncParams.Socket.State == WebSocketState.Open)
             {
@@ -363,119 +443,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             handleClientAsyncParams.Socket.Dispose();
         }
 
-        #endregion
-
-        #region Health Methods
-
-        public WebSocketInstanceStatistics GetStatistics()
-        {
-            return new WebSocketInstanceStatistics
-            {
-                TotalInstances = _instances.Count,
-                ActiveInstances = _instances.Values.Count(i => i.IsActive),
-                TotalClients = _instances.SelectMany(e => e.Value.Clients).Count(),
-                PendingInvites = _pendingInvites.Count,
-                Instances = _instances.Values.Select(i => new
-                {
-                    i.InstanceId,
-                    i.Port,
-                    CurrentConnections = i.Clients.Count,
-                    i.MaxConnections,
-                    i.IsActive,
-                    i.CreatedAt
-                })
-            };
-        }
-
-        #endregion
-
-        #region Virtual Methods
-
-        public virtual ValidateInviteTokenResult ValidateInviteToken(string token)
-        {
-            // Lógica de validação de convite (mantida)
-            var invitereq = GetAvailableInstance(Guid.Parse(token));
-
-            if (!_pendingInvites.TryGetValue(invitereq.Token, out var invite))
-            {
-                _logger.LogWarning("ValidateInviteToken: token not found: {Token}", token);
-                return new ValidateInviteTokenResult(false, "Token not found.", null);
-            }
-
-            if (invite.IsUsed)
-            {
-                _logger.LogWarning("ValidateInviteToken: token already used: {Token}", token);
-                return new ValidateInviteTokenResult(false, $"Token already used: \"{token}\".", null);
-            }
-
-            if (DateTime.UtcNow > invite.ExpiresAt)
-            {
-                _pendingInvites.TryRemove(token, out _);
-                _logger.LogWarning("ValidateInviteToken: token expired and removed: {Token}", token);
-
-                return new ValidateInviteTokenResult(false, $"Token expired: \"{token}\".", null);
-            }
-
-            _logger.LogDebug("ValidateInviteToken: token valid: {Token}", token);
-            return new ValidateInviteTokenResult(true, null, invite);
-        }
-
-        public virtual WebSocketAuthResponse Authentication(WebSocket ws, Dictionary<string, string> headers, Dictionary<string, string> cookies)
-        {
-            // Lógica de autenticação (mantida)
-            var token = "";
-
-            if (headers.ContainsKey("id"))
-            {
-                token = headers["id"];
-                _logger.LogDebug("Authentication: found token in Authorization header");
-            }
-
-            if (cookies.ContainsKey("id"))
-            {
-                token = cookies["id"];
-                _logger.LogDebug("Authentication: found token in id cookie");
-            }
-
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogWarning("Authentication: failed to find token in headers or cookies. HeadersContainsAuthorization={HasAuth}, CookiesContainId={HasId}",
-                    headers.ContainsKey("Authorization"),
-                    cookies.ContainsKey("id"));
-
-                return new WebSocketAuthResponse()
-                {
-                    Success = false,
-                    Message = "Authentication error: No token found",
-                    Token = token
-                };
-            }
-
-            _logger.LogInformation("Authentication: successful with token from {Source}",
-
-            headers.ContainsKey("Authorization") ? "Authorization header" : "id cookie");
-
-            return new WebSocketAuthResponse()
-            {
-                Success = true,
-                Message = "Authentication successful",
-                Token = token
-            };
-
-        }
-
-        #endregion
-
-        #region Helpers
-
-        private void MarkInviteAsUsed(string token)
-        {
-            if (_pendingInvites.TryGetValue(token, out var invite))
-            {
-                invite.IsUsed = true;
-            }
-        }
-
         private void CleanExpiredInvites()
         {
             var expiredTokens = _pendingInvites.Where(kv => DateTime.UtcNow > kv.Value.ExpiresAt).Select(kv => kv.Key).ToList();
@@ -490,7 +457,5 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 _logger.LogInformation("Removidos {Count} convites expirados", expiredTokens.Count);
             }
         }
-
-        #endregion
     }
 }

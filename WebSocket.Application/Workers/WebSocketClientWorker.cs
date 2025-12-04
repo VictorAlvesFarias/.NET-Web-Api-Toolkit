@@ -147,7 +147,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                 if (_handlers.TryGetValue(req.Event, out var handler))
                 {
-                    _ = Task.Run(() => handler(req.Body.ToString(), token), token);
+                    _ = Task.Run(() => handler(req.SerializeBody(), token), token);
                 }
             }
             catch (Exception ex)
