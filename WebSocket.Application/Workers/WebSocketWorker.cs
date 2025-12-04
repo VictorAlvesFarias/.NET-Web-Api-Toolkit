@@ -8,7 +8,6 @@ using System.Text.Json;
 
 namespace Web.Api.Toolkit.Ws.Application.Workers
 {
-    using global::Web.Api.Toolkit.Ws.Application.Delegates;
     using global::Web.Api.Toolkit.Ws.Application.Dtos;
     using System;
 
@@ -16,7 +15,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     {
         private readonly ILogger<WebSocketWorker> _logger;
         private readonly HttpListener _listener;
-        private readonly ConcurrentDictionary<string, List<WebSocketSubscription>> _subscriptions;
         private readonly ConcurrentDictionary<string, WebSocketInstance> _instances;
         private readonly ConcurrentDictionary<string, ConnectionInvite> _pendingInvites;
         private readonly int _basePort;
@@ -35,7 +33,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         {
             _logger = logger;
             _listener = new HttpListener();
-            _subscriptions = new ConcurrentDictionary<string, List<WebSocketSubscription>>();
+            // Removido: _subscriptions = new ConcurrentDictionary<string, List<WebSocketSubscription>>();
             _instances = new ConcurrentDictionary<string, WebSocketInstance>();
             _pendingInvites = new ConcurrentDictionary<string, ConnectionInvite>();
             _basePort = ExtractPortFromPrefix(prefix);
@@ -123,27 +121,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 Token = token,
                 ExpiresAt = invite.ExpiresAt
             };
-        }
-
-        public async Task Subscribe(string type, WebSocketHandler handler, WebSocketHandlerError? errorHandler = null)
-        {
-            if (string.IsNullOrWhiteSpace(type))
-            {
-                throw new ArgumentException("The type param is required.", nameof(type));
-            }
-
-            var list = _subscriptions.GetOrAdd(type, _ => new List<WebSocketSubscription>());
-
-            lock (list)
-            {
-                list.Add(new WebSocketSubscription()
-                {
-                    Type = type,
-                    Handler = handler,
-                    HandlerError = errorHandler
-                });
-                _logger.LogInformation("Subscribed handler for event type '{EventType}'. HandlerCount={HandlerCount}", type, list.Count);
-            }
         }
 
         public async Task SendAsync(Guid clientId, WebSocketRequest payload)
@@ -381,12 +358,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                     break;
                 }
-
-                ms.Seek(0, SeekOrigin.Begin);
-
-                var message = Encoding.UTF8.GetString(ms.ToArray());
-
-                RedirectQueues(message, handleClientAsyncParams);
             }
 
             handleClientAsyncParams.Socket.Dispose();
@@ -420,57 +391,9 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         #region Virtual Methods
 
-        public virtual void RedirectQueues(string message, WebSocketClient client)
-        {
-            _logger.LogDebug("RedirectQueues: received message: {Message}", message);
-
-            using var doc = JsonDocument.Parse(message);
-
-            if (!doc.RootElement.TryGetProperty("event", out var typeProp))
-            {
-                _logger.LogWarning("RedirectQueues: message does not contain 'event' property");
-
-                return;
-            }
-
-            var type = typeProp.GetString();
-
-            if (string.IsNullOrWhiteSpace(type))
-            {
-                _logger.LogWarning("RedirectQueues: event type is null or whitespace in message");
-
-                return;
-            }
-
-            _logger.LogDebug("RedirectQueues: routing event '{EventType}' to handlers", type);
-
-            if (_subscriptions.TryGetValue(type, out var handlers))
-            {
-                foreach (var h in handlers)
-                {
-                    try
-                    {
-                        var webSocketRequest = JsonSerializer.Deserialize<WebSocketRequest>(message);
-
-                        _ = Task.Run(() => h.Handler(client.Socket, webSocketRequest));
-
-                        _logger.LogDebug("RedirectQueues: handler queued for event '{EventType}'", type);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "RedirectQueues: handler for event '{EventType}' threw an exception", type);
-
-                        if (h.HandlerError != null)
-                        {
-                            _ = Task.Run(() => h.HandlerError(client.Socket, ex));
-                        }
-                    }
-                }
-            }
-        }
-
         public virtual ValidateInviteTokenResult ValidateInviteToken(string token)
         {
+            // Lógica de validação de convite (mantida)
             var invitereq = GetAvailableInstance(Guid.Parse(token));
 
             if (!_pendingInvites.TryGetValue(invitereq.Token, out var invite))
@@ -499,6 +422,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         public virtual WebSocketAuthResponse Authentication(WebSocket ws, Dictionary<string, string> headers, Dictionary<string, string> cookies)
         {
+            // Lógica de autenticação (mantida)
             var token = "";
 
             if (headers.ContainsKey("id"))
@@ -551,7 +475,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 invite.IsUsed = true;
             }
         }
-
 
         private void CleanExpiredInvites()
         {
