@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
 using System.Reflection;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
 using Web.Api.Toolkit.Ws.Application.Attributes;
@@ -21,20 +22,19 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     {
         private readonly ILogger<WebSocketClientWorker> _logger;
         private ClientWebSocket _socket;
-        private readonly ConcurrentDictionary<string, Func<WebSocketClientRequest, CancellationToken, Task>> _handlers;
+        private readonly ConcurrentDictionary<string, Func<string, CancellationToken, Task>> _handlers;
         private readonly TimeSpan _reconnectDelay;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly JsonSerializerOptions _serializerOptions;
         private bool _channelsRegistered;
 
-        public WebSocketClientWorker(
-            ILogger<WebSocketClientWorker> logger,
-            IServiceScopeFactory scopeFactory,
-            TimeSpan? reconnectDelay = null
-        )
+        private sealed record WebSocketChannelActionDescriptor(string EventName, Type ChannelType, MethodInfo MethodInfo);
+        private sealed record WebSocketHandlerActionDescriptor(string EventName, Type ChannelType);
+
+        public WebSocketClientWorker(ILogger<WebSocketClientWorker> logger, IServiceScopeFactory scopeFactory, TimeSpan? reconnectDelay = null)
         {
             _logger = logger;
-            _handlers = new ConcurrentDictionary<string, Func<WebSocketClientRequest, CancellationToken, Task>>();
+            _handlers = new ConcurrentDictionary<string, Func<string, CancellationToken, Task>>();
             _socket = new ClientWebSocket();
             _reconnectDelay = reconnectDelay ?? TimeSpan.FromSeconds(3);
             _scopeFactory = scopeFactory;
@@ -115,11 +115,16 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         protected virtual CookieContainer GetCookies()
         {
             return new();
-        }
+        }   
 
         protected virtual TimeSpan GetReconnectDelay()
         {
             return _reconnectDelay;
+        }
+
+        protected virtual object? Desserialize(string message, Type parameter)
+        {
+            return JsonSerializer.Deserialize(message, parameter, _serializerOptions);
         }
 
         protected virtual void ProcessMessage(string message, CancellationToken token)
@@ -127,11 +132,16 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             try
             {
                 var req = JsonSerializer.Deserialize<WebSocketClientRequest>(message, _serializerOptions);
+
                 if (req == null || string.IsNullOrWhiteSpace(req.Event))
+                {
                     return;
+                }
 
                 if (_handlers.TryGetValue(req.Event, out var handler))
-                    _ = Task.Run(() => handler(req, token), token);
+                {
+                    _ = Task.Run(() => handler(req.Body.ToString(), token), token);
+                }
             }
             catch (Exception ex)
             {
@@ -152,12 +162,20 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token);
         }
 
-        public void Subscribe(string eventType, Func<WebSocketClientRequest, CancellationToken, Task> handler)
+        public virtual void Subscribe<T>(string eventType, Func<T, CancellationToken, Task> handler)
         {
-            Subscribe(eventType, (_, request, token) => handler(request, token));
+            var descriptor = new WebSocketHandlerActionDescriptor(
+                eventType,
+                typeof(T)
+            );    
+            
+            Subscribe(eventType, async (services, request, token) =>
+            {
+                await InvokeHandler<T>(descriptor, services, request, handler, token);
+            });
         }
 
-        public void Subscribe(string eventType, Func<IServiceProvider, WebSocketClientRequest, CancellationToken, Task> handler)
+        public virtual void Subscribe(string eventType, Func<IServiceProvider, string, CancellationToken, Task> handler)
         {
             if (string.IsNullOrWhiteSpace(eventType))
                 throw new ArgumentException("The event name cannot be empty.", nameof(eventType));
@@ -172,7 +190,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             };
         }
 
-        public void RegisterChannel(Type channelType)
+        public virtual void Subscribe(string eventType, Func<WebSocketRequest, CancellationToken, Task> handler)
+        {
+            Subscribe<WebSocketRequest>(eventType, handler);
+        }
+
+        private void RegisterChannel(Type channelType)
         {
             if (channelType == null)
                 throw new ArgumentNullException(nameof(channelType));
@@ -201,7 +224,8 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 var descriptor = new WebSocketChannelActionDescriptor(
                     method.Attribute!.Event,
                     channelType,
-                    method.Method);
+                    method.Method
+                );
 
                 Subscribe(descriptor.EventName, async (services, request, token) =>
                 {
@@ -210,7 +234,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             }
         }
 
-        public void RegisterChannels()
+        private  void RegisterChannels()
         {
             var thisWorkerType = GetType();
             var baseChannelTypeForThisWorker = typeof(WebSocketChannelBase<>).MakeGenericType(thisWorkerType);
@@ -285,7 +309,14 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             throw new Exception("WebSocket connection is ended.");
         }
 
-        private async Task InvokeChannel(WebSocketChannelActionDescriptor descriptor, IServiceProvider services, WebSocketClientRequest request, CancellationToken token)
+        private async Task InvokeHandler<T>( WebSocketHandlerActionDescriptor descriptor, IServiceProvider services, string request, Func<T, CancellationToken, Task> handler, CancellationToken token)
+        {
+            var payload = Desserialize(request,descriptor.ChannelType);
+
+            await handler((T)payload!, token);
+        }
+
+        private async Task InvokeChannel(WebSocketChannelActionDescriptor descriptor, IServiceProvider services, string request, CancellationToken token)
         {
             var channel = services.GetRequiredService(descriptor.ChannelType);
             var context = new WebSocketRequestContext(request, services, token, this);
@@ -305,13 +336,10 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         private object?[] BuildArguments(WebSocketChannelActionDescriptor descriptor, WebSocketRequestContext context)
         {
             var parameters = descriptor.MethodInfo.GetParameters();
-            if (parameters.Length == 0)
-                return Array.Empty<object>();
 
-            var nonContextParameters = parameters.Count(p => !typeof(WebSocketRequestContext).IsAssignableFrom(p.ParameterType));
-            if (nonContextParameters > 1)
+            if (parameters.Length == 0)
             {
-                throw new InvalidOperationException($"Channel method '{descriptor.MethodInfo.Name}' on '{descriptor.ChannelType.Name}' can have at most one parameter besides {nameof(WebSocketRequestContext)}.");
+                return Array.Empty<object?>();
             }
 
             var args = new object?[parameters.Length];
@@ -319,21 +347,11 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             for (var index = 0; index < parameters.Length; index++)
             {
                 var parameter = parameters[index];
-                if (typeof(WebSocketRequestContext).IsAssignableFrom(parameter.ParameterType))
-                {
-                    args[index] = context;
-                    continue;
-                }
 
-                if (context.Request.Body is null)
-                    throw new InvalidOperationException($"Unable to deserialize message body for channel '{descriptor.ChannelType.Name}' action '{descriptor.MethodInfo.Name}'.");
-
-                args[index] = context.Request.Body.Value.Deserialize(parameter.ParameterType, _serializerOptions);
+                args[index] = Desserialize(context.Request, parameter.ParameterType);
             }
 
             return args;
         }
-
-        private sealed record WebSocketChannelActionDescriptor(string EventName, Type ChannelType, MethodInfo MethodInfo);
     }
 }

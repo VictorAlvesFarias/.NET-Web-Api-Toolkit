@@ -10,7 +10,7 @@ namespace Web.Api.Toolkit.Ws.Application.Contexts
     public class WebSocketRequestContext
     {
         public WebSocketRequestContext(
-            WebSocketClientRequest request,
+            string request,
             IServiceProvider services,
             CancellationToken cancellationToken,
             WebSocketClientWorker clientWorker)
@@ -21,7 +21,7 @@ namespace Web.Api.Toolkit.Ws.Application.Contexts
             ClientWorker = clientWorker;
         }
 
-        public WebSocketClientRequest Request { get; }
+        public string Request { get; }
         public IServiceProvider Services { get; }
         public CancellationToken CancellationToken { get; }
         public WebSocketClientWorker ClientWorker { get; }
