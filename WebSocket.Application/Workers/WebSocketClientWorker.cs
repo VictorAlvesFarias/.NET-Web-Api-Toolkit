@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -211,6 +212,27 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             throw new Exception("WebSocket connection is ended.");
         }
 
+        protected virtual void SetHttpContext(IServiceProvider serviceProvider, string message)
+        {
+            var httpContextAccessor = serviceProvider.GetService<IHttpContextAccessor>();
+
+            if (httpContextAccessor != null)
+            {
+                var req = JsonSerializer.Deserialize<WebSocketRequest>(message, _serializerOptions);
+
+                if (req?.Headers != null)
+                {
+                    var context = new DefaultHttpContext();
+
+                    foreach (var header in req.Headers)
+                    {
+                        context.Request.Headers.Add(header.Key, header.Value);
+                    }
+
+                    httpContextAccessor.HttpContext = context;
+                }
+            }
+        }
         private void Subscribe(string eventType, Func<IServiceProvider, string, CancellationToken, Task> handler)
         {
             if (string.IsNullOrWhiteSpace(eventType))
@@ -222,6 +244,9 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             _handlers[eventType] = async (request, token) =>
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
+
+                SetHttpContext(scope.ServiceProvider, request);
+
                 await handler(scope.ServiceProvider, request, token);
             };
         }
@@ -271,7 +296,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             }
         }
 
-        private  void RegisterChannels()
+        private void RegisterChannels()
         {
             var thisWorkerType = GetType();
             var baseChannelTypeForThisWorker = typeof(WebSocketChannelBase<>).MakeGenericType(thisWorkerType);
