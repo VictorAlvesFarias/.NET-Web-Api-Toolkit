@@ -1,9 +1,10 @@
 using System;
+using Web.Api.Toolkit.Ws.Application.Contexts;
 
 namespace Web.Api.Toolkit.Ws.Application.Attributes
 {
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
-    public sealed class WsActionAttribute : Attribute
+    public class WsActionAttribute : WsActionFilterAttribute
     {
         public WsActionAttribute(string @event)
         {
