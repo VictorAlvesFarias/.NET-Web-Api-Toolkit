@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using Web.Api.Toolkit.Ws.Application.Channels;
+using Web.Api.Toolkit.Ws.Application.Contexts;
 using Web.Api.Toolkit.Ws.Application.Workers;
 
 namespace Web.Api.Toolkit.Ws.Application.Extensions
@@ -19,6 +20,9 @@ namespace Web.Api.Toolkit.Ws.Application.Extensions
 
         public static IServiceCollection AddWebSocketChannels<TWorker>(this IServiceCollection services, ServiceLifetime lifetime, params Assembly[] assemblies) where TWorker : WebSocketClientWorker
         {
+            // Registrar o WebSocketRequestContextAccessor como singleton
+            services.AddSingleton<IWebSocketRequestContextAccessor, WebSocketRequestContextAccessor>();
+
             if (assemblies == null || assemblies.Length == 0)
             {
                 assemblies = AppDomain.CurrentDomain.GetAssemblies();
@@ -53,9 +57,6 @@ namespace Web.Api.Toolkit.Ws.Application.Extensions
 
             return services;
         }
-
-        // Removed non-generic AddWebSocketChannels methods since WebSocketChannelBase now requires a generic type parameter
-        // Use AddWebSocketChannels<TWorker>() instead
     }
 }
 

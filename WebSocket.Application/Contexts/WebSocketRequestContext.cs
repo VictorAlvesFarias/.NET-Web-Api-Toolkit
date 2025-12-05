@@ -25,6 +25,9 @@ namespace Web.Api.Toolkit.Ws.Application.Contexts
         public IServiceProvider Services { get; }
         public CancellationToken CancellationToken { get; }
         public WebSocketClientWorker ClientWorker { get; }
+        public Exception? Exception { get; set; }
+        public bool Error { get; set; }
+        public string? ErrorMessage { get; set; }
 
         public async Task SendAsync<TPayload>(TPayload payload, CancellationToken token = default)
         {

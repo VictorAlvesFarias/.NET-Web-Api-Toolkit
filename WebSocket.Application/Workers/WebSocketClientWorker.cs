@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -212,27 +211,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             throw new Exception("WebSocket connection is ended.");
         }
 
-        protected virtual void SetHttpContext(IServiceProvider serviceProvider, string message)
-        {
-            var httpContextAccessor = serviceProvider.GetService<IHttpContextAccessor>();
-
-            if (httpContextAccessor != null)
-            {
-                var req = JsonSerializer.Deserialize<WebSocketRequest>(message, _serializerOptions);
-
-                if (req?.Headers != null)
-                {
-                    var context = new DefaultHttpContext();
-
-                    foreach (var header in req.Headers)
-                    {
-                        context.Request.Headers.Add(header.Key, header.Value);
-                    }
-
-                    httpContextAccessor.HttpContext = context;
-                }
-            }
-        }
         private void Subscribe(string eventType, Func<IServiceProvider, string, CancellationToken, Task> handler)
         {
             if (string.IsNullOrWhiteSpace(eventType))
@@ -244,8 +222,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             _handlers[eventType] = async (request, token) =>
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
-
-                SetHttpContext(scope.ServiceProvider, request);
 
                 await handler(scope.ServiceProvider, request, token);
             };
@@ -341,17 +317,76 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         {
             var channel = services.GetRequiredService(descriptor.ChannelType);
             var context = new WebSocketRequestContext(request, services, token, this);
-            var setContextMethod = channel.GetType().GetMethod("SetContext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var contextAccessor = services.GetService<IWebSocketRequestContextAccessor>();
+
+            if (contextAccessor != null)
+            {
+                contextAccessor.Context = context;
+            }
             
+            var setContextMethod = channel.GetType().GetMethod("SetContext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
             setContextMethod?.Invoke(channel, new object[] { context });
 
             var args = BuildArguments(descriptor, context);
-            var result = descriptor.MethodInfo.Invoke(channel, args);
-
-            if (result is Task task)
+            var filters = GetFilters(descriptor);
+            
+            foreach (var filter in filters)
             {
-                await task;
+                try
+                {
+                    await filter.OnActionExecutingAsync(context);
+
+                    if (context.Error)
+                    {
+                        await filter.OnActionExecuted(context);
+
+                        return;
+                    }
+
+                    var result = descriptor.MethodInfo.Invoke(channel, args);
+
+                    if (result is Task task)
+                    {
+                        await task;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    context.Exception = ex;
+                    context.Error = true;
+
+                    await filter.OnActionExecuted(context);
+                    
+                    return;
+                }
+
+                await filter.OnActionExecuted(context);
             }
+        }
+        
+        private List<WsActionFilterAttribute> GetFilters(WebSocketChannelActionDescriptor descriptor)
+        {
+            var filters = new List<WsActionFilterAttribute>();
+            
+            // Filtros da classe
+            var classFilters = descriptor.ChannelType
+                .GetCustomAttributes<WsActionFilterAttribute>(true)
+                .Cast<WsActionFilterAttribute>();
+            
+            filters.AddRange(classFilters);
+            
+            // Filtros do método
+            var methodFilters = descriptor.MethodInfo
+                .GetCustomAttributes<WsActionFilterAttribute>(true)
+                .Cast<WsActionFilterAttribute>();
+            
+            filters.AddRange(methodFilters);
+            
+            // Ordenar por Order
+            return filters
+                .OrderBy(f => f is WsActionFilterAttribute attr ? attr.Order : 0)
+                .ToList();
         }
     }
 }
