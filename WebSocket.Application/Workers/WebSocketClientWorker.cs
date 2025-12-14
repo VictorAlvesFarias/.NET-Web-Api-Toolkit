@@ -323,12 +323,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             {
                 contextAccessor.Context = context;
             }
-            
-            var setContextMethod = channel.GetType().GetMethod("SetContext", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-            setContextMethod?.Invoke(channel, new object[] { context });
-
-            var args = BuildArguments(descriptor, context);
             var filters = GetFilters(descriptor);
             
             foreach (var filter in filters)
@@ -343,13 +338,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                         return;
                     }
-
-                    var result = descriptor.MethodInfo.Invoke(channel, args);
-
-                    if (result is Task task)
-                    {
-                        await task;
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -360,8 +348,40 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     
                     return;
                 }
+            }
 
-                await filter.OnActionExecuted(context);
+            var args = BuildArguments(descriptor, context);
+            var result = descriptor.MethodInfo.Invoke(channel, args);
+
+            if (result is Task task)
+            {
+                await task;
+            }
+
+            foreach (var filter in filters)
+            {
+                try
+                {
+                    if (context.Error)
+                    {
+                        await filter.OnActionExecuted(context);
+
+                        return;
+                    }
+                    else
+                    {
+                        await filter.OnActionExecuted(context);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    context.Exception = ex;
+                    context.Error = true;
+
+                    await filter.OnActionExecuted(context);
+
+                    return;
+                }
             }
         }
         
