@@ -2,7 +2,7 @@
 {
     public interface IFileBase
     {
-        byte[] GetBytes();
-        string GetMimeType();
+        byte[] Bytes { get; set; }
+        string MimeType { get; set; }
     }
 }

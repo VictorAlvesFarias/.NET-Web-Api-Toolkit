@@ -63,7 +63,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
             {
                 if (result.Success)
                 {
-                    return controller.File(result.Data.GetBytes(), result.Data.GetMimeType());
+                    return controller.File(result.Data.Bytes, result.Data.MimeType);
                 }
                 else if (result.Errors.Count > 0)
                 {
