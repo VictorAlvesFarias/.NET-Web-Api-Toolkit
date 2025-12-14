@@ -167,11 +167,35 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             var args = new object?[parameters.Length];
 
+            // Primeiro, deserializar o envelope completo da mensagem
+            using var envelope = JsonSerializer.Deserialize<JsonDocument>(context.Request, _serializerOptions);
+            
+            if (envelope == null)
+            {
+                return args;
+            }
+
+            // Extrair o Body do envelope
+            if (!envelope.RootElement.TryGetProperty("Body", out var bodyElement))
+            {
+                return args;
+            }
+
+            // Deserializar o Body para cada parâmetro
             for (var index = 0; index < parameters.Length; index++)
             {
                 var parameter = parameters[index];
 
-                args[index] = JsonSerializer.Deserialize(context.Request, parameter.ParameterType, _serializerOptions); ;
+                try
+                {
+                    var bodyJson = bodyElement.GetRawText();
+                    args[index] = JsonSerializer.Deserialize(bodyJson, parameter.ParameterType, _serializerOptions);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deserializing parameter {ParameterName} of type {ParameterType}", 
+                        parameter.Name, parameter.ParameterType.Name);
+                }
             }
 
             return args;

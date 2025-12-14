@@ -35,13 +35,7 @@ namespace Web.Api.Toolkit.Ws.Application.Dtos
 
         public string SerializeBody()
         {
-            var bodyText = _body?.GetRawText() ?? "null";
-
-            return JsonSerializer.Serialize(new
-            {
-                Event,
-                Body = _body.HasValue ? JsonSerializer.Deserialize<object>(bodyText) : null
-            });
+            return JsonSerializer.Serialize(this);
         }
 
         public T DeserializeBody<T>()
