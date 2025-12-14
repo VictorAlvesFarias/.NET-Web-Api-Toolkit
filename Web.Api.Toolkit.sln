@@ -21,8 +21,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Queues.Appl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Toolkit.Ws.Application", "WebSocket.Application\Web.Api.Toolkit.Ws.Application.csproj", "{FDFD973C-8905-505F-6428-B710AD430CE1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.ApplicationLog.Application", "Web.Api.ApplicationLog.Application\Web.Api.ApplicationLog.Application.csproj", "{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -141,18 +139,6 @@ Global
 		{FDFD973C-8905-505F-6428-B710AD430CE1}.Release|x64.Build.0 = Release|Any CPU
 		{FDFD973C-8905-505F-6428-B710AD430CE1}.Release|x86.ActiveCfg = Release|Any CPU
 		{FDFD973C-8905-505F-6428-B710AD430CE1}.Release|x86.Build.0 = Release|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Debug|x64.Build.0 = Debug|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Debug|x86.Build.0 = Debug|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Release|x64.ActiveCfg = Release|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Release|x64.Build.0 = Release|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Release|x86.ActiveCfg = Release|Any CPU
-		{BC0D8D0F-78D0-408F-B3F4-32098DA1DC6C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
