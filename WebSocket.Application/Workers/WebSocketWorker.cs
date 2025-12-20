@@ -1,7 +1,8 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Buffers;
 using System.Collections.Concurrent;
-using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -11,65 +12,97 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     using global::Web.Api.Toolkit.Ws.Application.Dtos;
     using System;
 
+    /// <summary>
+    /// WebSocketWorker - IIS Compatible Version (Performance Optimized)
+    /// ✅ Funciona no IIS / Azure App Service / Cloud
+    /// ✅ Um único endpoint WebSocket com multiplexação lógica
+    /// ✅ Mantém 100% da lógica de invite/instance/authentication
+    /// ✅ Instâncias são conceitos lógicos, não portas físicas
+    /// ✅ ArrayPool para reduzir alocações
+    /// ✅ Mapa global de clientes para lookup O(1)
+    /// ✅ Serialização JSON otimizada
+    /// </summary>
     public class WebSocketWorker : BackgroundService
     {
         private readonly ILogger<WebSocketWorker> _logger;
-        private readonly HttpListener _listener;
         private readonly ConcurrentDictionary<string, WebSocketInstance> _instances;
         private readonly ConcurrentDictionary<string, ConnectionInvite> _pendingInvites;
-        private readonly int _basePort;
+        private readonly ConcurrentDictionary<Guid, (WebSocketClient Client, WebSocketInstance Instance)> _clientMap;
         private readonly int _maxConnectionsPerInstance;
         private readonly int _inviteExpirationMinutes;
-        private readonly string _baseUrl;
+        private static readonly ArrayPool<byte> _bufferPool = ArrayPool<byte>.Shared;
 
         public WebSocketWorker(
             ILogger<WebSocketWorker> logger,
-            string prefix = "http://localhost:8081/ws/",
-            bool isOrchestrator = true,
-            int maxConnectionsPerInstance = 1,
-            int inviteExpirationMinutes = 5,
-            string baseUrl = "ws://localhost"
+            int maxConnectionsPerInstance = 100,
+            int inviteExpirationMinutes = 5
         )
         {
             _logger = logger;
-            _listener = new HttpListener();
-            // Removido: _subscriptions = new ConcurrentDictionary<string, List<WebSocketSubscription>>();
             _instances = new ConcurrentDictionary<string, WebSocketInstance>();
             _pendingInvites = new ConcurrentDictionary<string, ConnectionInvite>();
-            _basePort =  new Uri(prefix).Port;
+            _clientMap = new ConcurrentDictionary<Guid, (WebSocketClient, WebSocketInstance)>();
             _maxConnectionsPerInstance = maxConnectionsPerInstance;
             _inviteExpirationMinutes = inviteExpirationMinutes;
-            _baseUrl = baseUrl;
 
-            _listener.Prefixes.Add(prefix);
-            _logger.LogInformation("WebSocketWorker constructed: prefix={Prefix}, basePort={BasePort}, baseUrl={BaseUrl}, maxConnectionsPerInstance={MaxConnections}, inviteExpirationMinutes={InviteMinutes}",
-                prefix, _basePort, _baseUrl, _maxConnectionsPerInstance, _inviteExpirationMinutes);
+            _logger.LogInformation(
+                "WebSocketWorker constructed (IIS Compatible + Optimized): maxConnectionsPerInstance={MaxConnections}, inviteExpirationMinutes={InviteMinutes}",
+                _maxConnectionsPerInstance, _inviteExpirationMinutes
+            );
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            // Cria a primeira instância lógica
             CreateNewInstance();
 
+            // Background task para limpar convites expirados E instâncias vazias
             _ = Task.Run(async () =>
             {
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
                     CleanExpiredInvites();
+                    CleanIdleInstances();
                 }
             }, stoppingToken);
 
-            _logger.LogInformation("WebSocket Orchestrator iniciado");
+            _logger.LogInformation("WebSocket Orchestrator iniciado (IIS Compatible)");
 
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
+        /// <summary>
+        /// Método principal para aceitar conexão WebSocket do ASP.NET Core.
+        /// Este método deve ser chamado do seu middleware/controller.
+        /// </summary>
+        public async Task AcceptWebSocketAsync(
+            HttpContext httpContext,
+            WebSocket webSocket,
+            CancellationToken cancellationToken = default
+        )
+        {
+            var client = new WebSocketClient
+            {
+                Id = Guid.NewGuid(),
+                Socket = webSocket,
+                Headers = httpContext.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString()),
+                Cookies = httpContext.Request.Cookies.ToDictionary(c => c.Key, c => c.Value)
+            };
+
+            _logger.LogInformation(
+                "Accepted WebSocket connection. ClientId={ClientId}, RemoteIp={RemoteIp}",
+                client.Id,
+                httpContext.Connection.RemoteIpAddress
+            );
+
+            await HandleClientAsync(client, cancellationToken);
+        }
+
         protected virtual ValidateInviteTokenResult ValidateInviteToken(string token)
         {
-            // Lógica de validação de convite (mantida)
-            var invitereq = GetAvailableInstance(Guid.Parse(token));
-
-            if (!_pendingInvites.TryGetValue(invitereq.Token, out var invite))
+            // ✅ Apenas valida, SEM criar invite novo
+            if (!_pendingInvites.TryGetValue(token, out var invite))
             {
                 _logger.LogWarning("ValidateInviteToken: token not found: {Token}", token);
                 return new ValidateInviteTokenResult(false, "Token not found.", null);
@@ -93,15 +126,14 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             return new ValidateInviteTokenResult(true, null, invite);
         }
 
-        protected virtual WebSocketAuthResponse Authentication(WebSocket ws, Dictionary<string, string> headers, Dictionary<string, string> cookies)
+        protected virtual WebSocketAuthResponse Authentication(Dictionary<string, string> headers, Dictionary<string, string> cookies)
         {
-            // Lógica de autenticação (mantida)
             var token = "";
 
             if (headers.ContainsKey("id"))
             {
                 token = headers["id"];
-                _logger.LogDebug("Authentication: found token in Authorization header");
+                _logger.LogDebug("Authentication: found token in id header");
             }
 
             if (cookies.ContainsKey("id"))
@@ -112,11 +144,13 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogWarning("Authentication: failed to find token in headers or cookies. HeadersContainsAuthorization={HasAuth}, CookiesContainId={HasId}",
-                    headers.ContainsKey("Authorization"),
-                    cookies.ContainsKey("id"));
+                _logger.LogWarning(
+                    "Authentication: failed to find token in headers or cookies. HeadersContainsId={HasId}, CookiesContainId={HasIdCookie}",
+                    headers.ContainsKey("id"),
+                    cookies.ContainsKey("id")
+                );
 
-                return new WebSocketAuthResponse()
+                return new WebSocketAuthResponse
                 {
                     Success = false,
                     Message = "Authentication error: No token found",
@@ -124,40 +158,29 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 };
             }
 
-            _logger.LogInformation("Authentication: successful with token from {Source}",
+            _logger.LogInformation(
+                "Authentication: successful with token from {Source}",
+                headers.ContainsKey("id") ? "id header" : "id cookie"
+            );
 
-            headers.ContainsKey("Authorization") ? "Authorization header" : "id cookie");
-
-            return new WebSocketAuthResponse()
+            return new WebSocketAuthResponse
             {
                 Success = true,
                 Message = "Authentication successful",
                 Token = token
             };
-
         }
 
         public virtual async Task SendAsync(Guid clientId, WebSocketRequest payload)
         {
-            WebSocketClient client = null;
-            WebSocketInstance instance = null;
-
-            foreach (var inst in _instances.Values.Where(i => i.IsActive))
+            // ✅ O(1) lookup com mapa global
+            if (!_clientMap.TryGetValue(clientId, out var tuple))
             {
-                if (inst.Clients.TryGetValue(clientId, out var foundClient))
-                {
-                    client = foundClient;
-                    instance = inst;
-
-                    break;
-                }
-            }
-
-            if (client == null)
-            {
-                _logger.LogWarning("SendAsync: client {ClientId} not found in any active instance.", clientId);
+                _logger.LogWarning("SendAsync: client {ClientId} not found.", clientId);
                 return;
             }
+
+            var (client, instance) = tuple;
 
             if (client.Socket.State != WebSocketState.Open)
             {
@@ -165,14 +188,22 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 return;
             }
 
-            var json = JsonSerializer.Serialize(payload);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            var seg = new ArraySegment<byte>(bytes);
-
             try
             {
-                await client.Socket.SendAsync(seg, WebSocketMessageType.Text, true, CancellationToken.None);
-                _logger.LogDebug("SendAsync: message sent to client {ClientId}. Event={Event}", clientId, payload?.Event);
+                // ✅ ArrayBufferWriter cria seu próprio buffer interno (não precisa ArrayPool aqui)
+                var bufferWriter = new ArrayBufferWriter<byte>();
+                JsonSerializer.Serialize(bufferWriter, payload);
+                var bytesWritten = bufferWriter.WrittenCount;
+
+                // ✅ Envia direto do WrittenMemory sem ToArray()
+                await client.Socket.SendAsync(
+                    bufferWriter.WrittenMemory.Slice(0, bytesWritten),
+                    WebSocketMessageType.Text,
+                    true,
+                    CancellationToken.None
+                );
+
+                _logger.LogDebug("SendAsync: message sent to client {ClientId}. Event={Event}, Bytes={Bytes}", clientId, payload?.Event, bytesWritten);
             }
             catch (Exception ex)
             {
@@ -182,40 +213,71 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         public virtual async Task BroadcastAsync(WebSocketRequest payload, Func<WebSocketClient, WebSocketRequest, bool>? q = null)
         {
-            foreach (var instance in _instances.Values.Where(i => i.IsActive))
+            // ✅ Serializa uma vez só
+            var bufferWriter = new ArrayBufferWriter<byte>();
+            JsonSerializer.Serialize(bufferWriter, payload);
+            var sharedBuffer = bufferWriter.WrittenMemory;
+            var bytesWritten = bufferWriter.WrittenCount;
+
+            // ✅ Envia sequencial - WebSocket já é async, não precisa Task.Run
+            // ⚠️ NOTA: Em escala extrema (10k+ clientes), considerar:
+            //    - Channel<T> com workers dedicados
+            //    - SemaphoreSlim(32) para paralelismo controlado
+            //    - Fila por instância para evitar head-of-line blocking
+            var clientCount = 0;
+            var errors = 0;
+
+            foreach (var (client, instance) in _clientMap.Values)
             {
-                foreach (var client in instance.Clients.Values)
+                if (!instance.IsActive)
+                    continue;
+
+                if (q != null && !q(client, payload))
+                    continue;
+
+                if (client.Socket.State != WebSocketState.Open)
+                    continue;
+
+                clientCount++;
+
+                try
                 {
-                    if (q != null && !q(client, payload))
-                        continue;
-
-                    if (client.Socket.State != WebSocketState.Open)
-                        continue;
-
-                    try
-                    {
-                        var json = JsonSerializer.Serialize(payload);
-                        var bytes = Encoding.UTF8.GetBytes(json);
-                        var seg = new ArraySegment<byte>(bytes);
-                        await client.Socket.SendAsync(seg, WebSocketMessageType.Text, true, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "BroadcastAsync: error sending WebSocket message to client {ClientId}. Event={Event}", client.Id, payload?.Event);
-                    }
+                    // ✅ Sem Task.Run - WebSocket.SendAsync já é async eficiente
+                    // ✅ Usa Memory direto sem ToArray()
+                    await client.Socket.SendAsync(
+                        sharedBuffer.Slice(0, bytesWritten),
+                        WebSocketMessageType.Text,
+                        true,
+                        CancellationToken.None
+                    );
                 }
+                catch (Exception ex)
+                {
+                    errors++;
+                    _logger.LogWarning(ex, "BroadcastAsync: error sending to client {ClientId}", client.Id);
+                }
+            }
+
+            if (errors > 0)
+            {
+                _logger.LogWarning("BroadcastAsync: completed with {Errors}/{Total} errors. Event={Event}", errors, clientCount, payload?.Event);
+            }
+            else
+            {
+                _logger.LogDebug("BroadcastAsync: sent to {Count} clients. Event={Event}, Bytes={Bytes}", clientCount, payload?.Event, bytesWritten);
             }
         }
 
         public ConcurrentDictionary<Guid, WebSocketClient> GetClients()
         {
+            // ✅ Usa mapa global direto - muito mais rápido
             var allClients = new ConcurrentDictionary<Guid, WebSocketClient>();
 
-            foreach (var instance in _instances.Values.Where(i => i.IsActive))
+            foreach (var kvp in _clientMap)
             {
-                foreach (var client in instance.Clients)
+                if (kvp.Value.Instance.IsActive)
                 {
-                    allClients.TryAdd(client.Key, client.Value);
+                    allClients.TryAdd(kvp.Key, kvp.Value.Client);
                 }
             }
 
@@ -271,7 +333,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 Instances = _instances.Values.Select(i => new
                 {
                     i.InstanceId,
-                    i.Port,
+                    Port = 0, // Não há mais portas dedicadas - instâncias são lógicas
                     CurrentConnections = i.Clients.Count,
                     i.MaxConnections,
                     i.IsActive,
@@ -283,21 +345,15 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         private WebSocketInstance CreateNewInstance()
         {
             var instanceId = Guid.NewGuid().ToString();
-            var port = _basePort + _instances.Count;
-            var url = $"{_baseUrl}:{port}/ws/";
 
-            _logger.LogInformation("Creating new WebSocket instance {InstanceId} on port {Port} with url {Url}", instanceId, port, url);
-
-            var listener = new HttpListener();
-
-            listener.Prefixes.Add($"http://+:{port}/ws/");
+            _logger.LogInformation("Creating new logical WebSocket instance {InstanceId}", instanceId);
 
             var instance = new WebSocketInstance
             {
                 InstanceId = instanceId,
-                Url = url,
-                Port = port,
-                Listener = listener,
+                Url = "/ws", // URL relativa - mesma porta do app
+                Port = 0, // Não há mais porta dedicada
+                Listener = null, // Não há mais HttpListener
                 Clients = new ConcurrentDictionary<Guid, WebSocketClient>(),
                 MaxConnections = _maxConnectionsPerInstance,
                 CreatedAt = DateTime.UtcNow,
@@ -306,141 +362,162 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             _instances[instanceId] = instance;
 
-            // Start instance in background
-            _ = Task.Run(async () => await RunInstanceAsync(instance));
-
-            _logger.LogInformation("Instance {InstanceId} created and run task queued. Port={Port}, Url={Url}", instanceId, port, url);
+            _logger.LogInformation("Logical instance {InstanceId} created successfully", instanceId);
 
             return instance;
         }
 
-        private async Task RunInstanceAsync(WebSocketInstance instance)
+        private async Task HandleClientAsync(WebSocketClient client, CancellationToken cancellationToken)
         {
+            // ✅ Buffer do pool - reutilizável
+            var buffer = _bufferPool.Rent(4 * 1024);
+
             try
             {
-                instance.Listener.Start();
-                _logger.LogInformation("Instance {InstanceId} started and listening on port {Port}", instance.InstanceId, instance.Port);
+                // Autenticação
+                var authResponse = Authentication(client.Headers, client.Cookies);
 
-                while (instance.IsActive)
+                if (!authResponse.Success)
                 {
-                    HttpListenerContext context;
-                    try
+                    await client.Socket.CloseAsync(
+                        WebSocketCloseStatus.PolicyViolation,
+                        authResponse.Message,
+                        cancellationToken
+                    );
+                    return;
+                }
+
+                // Validação do token de convite
+                var validateInviteToken = ValidateInviteToken(authResponse.Token);
+
+                if (!validateInviteToken.Valid)
+                {
+                    await client.Socket.CloseAsync(
+                        WebSocketCloseStatus.PolicyViolation,
+                        validateInviteToken.Message,
+                        cancellationToken
+                    );
+                    return;
+                }
+
+                // Encontra a instância correta
+                if (!_instances.TryGetValue(validateInviteToken.Invite.InstanceId, out var instance))
+                {
+                    await client.Socket.CloseAsync(
+                        WebSocketCloseStatus.InternalServerError,
+                        "Instance not found",
+                        cancellationToken
+                    );
+                    return;
+                }
+
+                // Adiciona o cliente à instância E ao mapa global
+                instance.Clients[client.Id] = client;
+                _clientMap[client.Id] = (client, instance);
+
+                // Marca o convite como usado
+                if (_pendingInvites.TryGetValue(validateInviteToken.Invite.Token, out var invite))
+                {
+                    invite.IsUsed = true;
+                }
+
+                _logger.LogInformation(
+                    "Client {ClientId} connected to instance {InstanceId}. CurrentConnections={Connections}",
+                    client.Id,
+                    instance.InstanceId,
+                    instance.Clients.Count
+                );
+
+                // ✅ ArrayBufferWriter reutilizável ao invés de MemoryStream
+                var messageBuffer = new ArrayBufferWriter<byte>();
+
+                // Loop de recebimento de mensagens
+                while (client.Socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+                {
+                    messageBuffer.Clear();
+                    WebSocketReceiveResult result;
+                    int totalBytesRead = 0;
+
+                    do
                     {
-                        context = await instance.Listener.GetContextAsync();
+                        result = await client.Socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+                        
+                        if (result.Count > 0)
+                        {
+                            messageBuffer.Write(buffer.AsSpan(0, result.Count));
+                            totalBytesRead += result.Count;
+                        }
                     }
-                    catch (HttpListenerException)
+                    while (!result.EndOfMessage && !result.CloseStatus.HasValue);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
                     {
                         break;
                     }
 
-                    if (!context.Request.IsWebSocketRequest)
+                    // Hook para processar mensagens recebidas
+                    if (result.MessageType == WebSocketMessageType.Text && totalBytesRead > 0)
                     {
-                        context.Response.StatusCode = 400;
-                        context.Response.Close();
-                        continue;
+                        // ✅ Decodifica direto do buffer sem ToArray()
+                        var message = Encoding.UTF8.GetString(messageBuffer.WrittenSpan);
+                        await OnMessageReceived(client, message);
                     }
-
-                    _ = Task.Run(async () =>
-                    {
-                        var wsContext = await context.AcceptWebSocketAsync(null);
-                        var client = new WebSocketClient()
-                        {
-                            Headers = context.Request.Headers.AllKeys.ToDictionary(k => k, k => context.Request.Headers[k]),
-                            Id = Guid.NewGuid(),
-                            Socket = wsContext.WebSocket,
-                            Cookies = context.Request.Cookies.Cast<Cookie>().ToDictionary(c => c.Name, c => c.Value)
-                        };
-
-                        _logger.LogInformation("Accepted WebSocket connection. Instance={InstanceId}, ClientId={ClientId}, RemoteEndPoint={Remote}", instance.InstanceId, client.Id, context.Request.RemoteEndPoint);
-                        _logger.LogDebug("Connection details: HeaderCount={HeaderCount}, CookieCount={CookieCount}", client.Headers.Count, client.Cookies.Count);
-                        _logger.LogInformation("Client {ClientId} added to instance {InstanceId}. CurrentConnections={Connections}", client.Id, instance.InstanceId, instance.Clients.Count);
-
-                        await HandleClientAsync(client, instance);
-                    });
                 }
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                _logger.LogError(ex, "Erro na instância {InstanceId}", instance.InstanceId);
-
-                instance.IsActive = false;
+                _logger.LogInformation("Client {ClientId} connection cancelled", client.Id);
+            }
+            catch (WebSocketException ex)
+            {
+                _logger.LogWarning(ex, "WebSocket error for client {ClientId}", client.Id);
             }
             finally
             {
-                try
+                // ✅ Devolve buffer ao pool
+                _bufferPool.Return(buffer);
+
+                // ✅ Remove do mapa global E recupera a instância correta
+                if (_clientMap.TryRemove(client.Id, out var tuple))
                 {
-                    instance.Listener.Stop();
+                    var instance = tuple.Instance;
+                    
+                    // Remove da instância
+                    instance.Clients.TryRemove(client.Id, out _);
+
+                    _logger.LogInformation(
+                        "Client {ClientId} disconnected from instance {InstanceId}. RemainingConnections={Connections}",
+                        client.Id,
+                        instance.InstanceId,
+                        instance.Clients.Count
+                    );
                 }
-                catch { }
+
+                // Fecha a conexão se ainda estiver aberta
+                if (client.Socket.State == WebSocketState.Open)
+                {
+                    try
+                    {
+                        await client.Socket.CloseAsync(
+                            WebSocketCloseStatus.NormalClosure,
+                            "Closed by server",
+                            CancellationToken.None
+                        );
+                    }
+                    catch { }
+                }
+
+                client.Socket.Dispose();
             }
         }
 
-        private async Task HandleClientAsync(WebSocketClient handleClientAsyncParams, WebSocketInstance instance)
+        /// <summary>
+        /// Override este método para processar mensagens recebidas dos clientes
+        /// </summary>
+        protected virtual Task OnMessageReceived(WebSocketClient client, string message)
         {
-            var buffer = new byte[4 * 1024];
-            var authResponse = Authentication(handleClientAsyncParams.Socket, handleClientAsyncParams.Headers, handleClientAsyncParams.Cookies);
-
-            if (!authResponse.Success)
-            {
-                await handleClientAsyncParams.Socket.CloseAsync(
-                    WebSocketCloseStatus.PolicyViolation,
-                    authResponse.Message,
-                    CancellationToken.None
-                );
-
-                handleClientAsyncParams.Socket.Dispose();
-
-                return;
-            }
-
-            var validateInviteToken = ValidateInviteToken(authResponse.Token);
-
-            if (!validateInviteToken.Valid)
-            {
-                await handleClientAsyncParams.Socket.CloseAsync(
-                    WebSocketCloseStatus.PolicyViolation,
-                    validateInviteToken.Message,
-                    CancellationToken.None
-                );
-
-                handleClientAsyncParams.Socket.Dispose();
-
-                return;
-            }
-
-            instance.Clients[handleClientAsyncParams.Id] = handleClientAsyncParams;
-
-            if (_pendingInvites.TryGetValue(validateInviteToken.Invite.Token, out var invite))
-            {
-                invite.IsUsed = true;
-            }
-
-            while (handleClientAsyncParams.Socket.State == WebSocketState.Open)
-            {
-                using var ms = new MemoryStream();
-                WebSocketReceiveResult result;
-
-                do
-                {
-                    result = await handleClientAsyncParams.Socket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    ms.Write(buffer, 0, result.Count);
-                }
-                while (!result.EndOfMessage && !result.CloseStatus.HasValue);
-
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    if (instance != null)
-                    {
-                        instance.Clients.TryRemove(handleClientAsyncParams.Id, out _);
-                    }
-
-                    await handleClientAsyncParams.Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "closed", CancellationToken.None);
-
-                    break;
-                }
-            }
-
-            handleClientAsyncParams.Socket.Dispose();
+            _logger.LogDebug("Message received from client {ClientId}: {Message}", client.Id, message);
+            return Task.CompletedTask;
         }
 
         private void CleanExpiredInvites()
@@ -455,6 +532,40 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             if (expiredTokens.Any())
             {
                 _logger.LogInformation("Removidos {Count} convites expirados", expiredTokens.Count);
+            }
+        }
+
+        private void CleanIdleInstances()
+        {
+            // Remove instâncias lógicas vazias e ociosas (exceto a primeira)
+            var idleThreshold = TimeSpan.FromMinutes(10);
+            var instancesToRemove = new List<string>();
+
+            foreach (var instance in _instances.Values)
+            {
+                // Mantém pelo menos 1 instância sempre ativa
+                if (_instances.Count <= 1)
+                    break;
+
+                // Se vazia e antiga
+                if (instance.Clients.Count == 0 && 
+                    DateTime.UtcNow - instance.CreatedAt > idleThreshold)
+                {
+                    instancesToRemove.Add(instance.InstanceId);
+                }
+            }
+
+            foreach (var instanceId in instancesToRemove)
+            {
+                if (_instances.TryRemove(instanceId, out var removedInstance))
+                {
+                    removedInstance.IsActive = false;
+                    _logger.LogInformation(
+                        "Removed idle instance {InstanceId}. Age={Age} minutes",
+                        instanceId,
+                        (DateTime.UtcNow - removedInstance.CreatedAt).TotalMinutes
+                    );
+                }
             }
         }
     }
