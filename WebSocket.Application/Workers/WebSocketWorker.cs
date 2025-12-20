@@ -192,7 +192,10 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             {
                 // ✅ ArrayBufferWriter cria seu próprio buffer interno (não precisa ArrayPool aqui)
                 var bufferWriter = new ArrayBufferWriter<byte>();
-                JsonSerializer.Serialize(bufferWriter, payload);
+                using (var writer = new Utf8JsonWriter(bufferWriter))
+                {
+                    JsonSerializer.Serialize(writer, payload);
+                }
                 var bytesWritten = bufferWriter.WrittenCount;
 
                 // ✅ Envia direto do WrittenMemory sem ToArray()
@@ -215,7 +218,10 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         {
             // ✅ Serializa uma vez só
             var bufferWriter = new ArrayBufferWriter<byte>();
-            JsonSerializer.Serialize(bufferWriter, payload);
+            using (var writer = new Utf8JsonWriter(bufferWriter))
+            {
+                JsonSerializer.Serialize(writer, payload);
+            }
             var sharedBuffer = bufferWriter.WrittenMemory;
             var bytesWritten = bufferWriter.WrittenCount;
 
