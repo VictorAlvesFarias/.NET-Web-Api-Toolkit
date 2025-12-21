@@ -21,6 +21,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     public class WebSocketClientWorker : BackgroundService
     {
         private readonly ILogger<WebSocketClientWorker> _logger;
+        protected ILogger<WebSocketClientWorker> Logger => _logger;
         private ClientWebSocket _socket;
         private readonly ConcurrentDictionary<string, Func<string, CancellationToken, Task>> _handlers;
         private readonly TimeSpan _reconnectDelay;
@@ -90,7 +91,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 {
                     _socket = new ClientWebSocket();
 
-                    var url = GetUrl();
+                    var url = await GetUrlAsync();
 
                     foreach (var header in GetHeaders())
                     {
@@ -109,9 +110,16 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 {
                     _logger.LogWarning(ex, "Erro na conexão WS, reconectando em {0}s...", GetReconnectDelay().TotalSeconds);
 
+                    await OnDisconnectedAsync();
+
                     await Task.Delay(GetReconnectDelay(), stoppingToken);
                 }
             }
+        }
+
+        protected virtual async Task<string> GetUrlAsync()
+        {
+            return await Task.FromResult(GetUrl());
         }
 
         protected virtual string GetUrl()
@@ -132,6 +140,11 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         protected virtual TimeSpan GetReconnectDelay()
         {
             return _reconnectDelay;
+        }
+
+        protected virtual Task OnDisconnectedAsync()
+        {
+            return Task.CompletedTask;
         }
 
         protected virtual void ProcessMessage(string message, CancellationToken token)

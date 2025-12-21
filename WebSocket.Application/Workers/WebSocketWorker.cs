@@ -130,24 +130,24 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         {
             var token = "";
 
-            if (headers.ContainsKey("id"))
+            if (headers.ContainsKey("x-token-invite"))
             {
-                token = headers["id"];
-                _logger.LogDebug("Authentication: found token in id header");
+                token = headers["x-token-invite"];
+                _logger.LogDebug("Authentication: found token in x-token-invite header");
             }
 
-            if (cookies.ContainsKey("id"))
+            if (cookies.ContainsKey("x-token-invite"))
             {
-                token = cookies["id"];
-                _logger.LogDebug("Authentication: found token in id cookie");
+                token = cookies["x-token-invite"];
+                _logger.LogDebug("Authentication: found token in x-token-invite cookie");
             }
 
             if (string.IsNullOrEmpty(token))
             {
                 _logger.LogWarning(
-                    "Authentication: failed to find token in headers or cookies. HeadersContainsId={HasId}, CookiesContainId={HasIdCookie}",
-                    headers.ContainsKey("id"),
-                    cookies.ContainsKey("id")
+                    "Authentication: failed to find token in headers or cookies. HeadersContainsToken={HasToken}, CookiesContainToken={HasTokenCookie}",
+                    headers.ContainsKey("x-token-invite"),
+                    cookies.ContainsKey("x-token-invite")
                 );
 
                 return new WebSocketAuthResponse
@@ -160,7 +160,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             _logger.LogInformation(
                 "Authentication: successful with token from {Source}",
-                headers.ContainsKey("id") ? "id header" : "id cookie"
+                headers.ContainsKey("x-token-invite") ? "x-token-invite header" : "x-token-invite cookie"
             );
 
             return new WebSocketAuthResponse
@@ -185,6 +185,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             if (client.Socket.State != WebSocketState.Open)
             {
                 _logger.LogWarning("SendAsync: client {ClientId} socket is not open. CurrentState={State}", clientId, client.Socket.State);
+
                 return;
             }
 
@@ -192,10 +193,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             {
                 // ✅ ArrayBufferWriter cria seu próprio buffer interno (não precisa ArrayPool aqui)
                 var bufferWriter = new ArrayBufferWriter<byte>();
+
                 using (var writer = new Utf8JsonWriter(bufferWriter))
                 {
                     JsonSerializer.Serialize(writer, payload);
                 }
+
                 var bytesWritten = bufferWriter.WrittenCount;
 
                 // ✅ Envia direto do WrittenMemory sem ToArray()
