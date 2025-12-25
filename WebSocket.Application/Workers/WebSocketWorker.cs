@@ -438,7 +438,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 );
 
                 // Chama o hook para classes derivadas
-                await OnClientConnectedAsync(client.Id.ToString(), client.Headers, client.Cookies);
+                await OnClientConnectedAsync(client);
 
                 // ✅ ArrayBufferWriter reutilizável ao invés de MemoryStream
                 var messageBuffer = new ArrayBufferWriter<byte>();
@@ -505,7 +505,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     );
 
                     // Chama o hook para classes derivadas
-                    await OnClientDisconnectedAsync(client.Id.ToString(), client.Headers, client.Cookies);
+                    await OnClientDisconnectedAsync(client);
                 }
 
                 // Fecha a conexão se ainda estiver aberta
@@ -538,7 +538,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         /// <summary>
         /// Override este método para ser notificado quando um cliente conectar
         /// </summary>
-        protected virtual Task OnClientConnectedAsync(string clientId, Dictionary<string, string> headers, Dictionary<string, string> cookies)
+        protected virtual Task OnClientConnectedAsync(WebSocketClient client)
         {
             return Task.CompletedTask;
         }
@@ -546,7 +546,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         /// <summary>
         /// Override este método para ser notificado quando um cliente desconectar
         /// </summary>
-        protected virtual Task OnClientDisconnectedAsync(string clientId, Dictionary<string, string> headers, Dictionary<string, string> cookies)
+        protected virtual Task OnClientDisconnectedAsync(WebSocketClient client)
         {
             return Task.CompletedTask;
         }
