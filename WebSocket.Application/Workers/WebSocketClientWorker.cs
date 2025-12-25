@@ -104,6 +104,8 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                     _logger.LogInformation("Cliente WS conectado: {0}", url);
 
+                    await OnConnectedAsync();
+
                     await ReceiveLoop(stoppingToken);
                 }
                 catch (Exception ex)
@@ -140,6 +142,11 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         protected virtual TimeSpan GetReconnectDelay()
         {
             return _reconnectDelay;
+        }
+
+        protected virtual Task OnConnectedAsync()
+        {
+            return Task.CompletedTask;
         }
 
         protected virtual Task OnDisconnectedAsync()
