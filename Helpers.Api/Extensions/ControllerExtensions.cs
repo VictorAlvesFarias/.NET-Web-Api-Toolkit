@@ -63,7 +63,20 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
             {
                 if (result.Success)
                 {
-                    return controller.File(result.Data.Bytes, result.Data.MimeType);
+                    var fileName = "download.zip";
+                    
+                    // Tentar obter o nome do arquivo se o tipo tiver a propriedade Name
+                    var nameProperty = result.Data.GetType().GetProperty("Name");
+                    if (nameProperty != null)
+                    {
+                        var nameValue = nameProperty.GetValue(result.Data) as string;
+                        if (!string.IsNullOrEmpty(nameValue))
+                        {
+                            fileName = nameValue;
+                        }
+                    }
+
+                    return controller.File(result.Data.Bytes, result.Data.MimeType, fileName);
                 }
                 else if (result.Errors.Count > 0)
                 {
