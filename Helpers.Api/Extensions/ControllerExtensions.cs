@@ -57,7 +57,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
                 });
             }
         }
-        public static IActionResult FileResult<T>(this ControllerBase controller, BaseResponse<T> result) where T : IFileBase
+        public static IActionResult FileResult<T>(this ControllerBase controller, BaseResponse<T> result, bool enableRangeProcessing) where T : IFileBase
         {
             try
             {
@@ -76,7 +76,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
                         }
                     }
 
-                    return controller.File(result.Data.Bytes, result.Data.MimeType, fileName);
+                    return controller.File(result.Data.Bytes, result.Data.MimeType, fileName, enableRangeProcessing);
                 }
                 else if (result.Errors.Count > 0)
                 {
