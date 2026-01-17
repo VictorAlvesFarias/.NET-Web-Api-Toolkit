@@ -21,13 +21,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     public class WebSocketClientWorker : BackgroundService
     {
         private readonly ILogger<WebSocketClientWorker> _logger;
-        protected ILogger<WebSocketClientWorker> Logger => _logger;
-        private ClientWebSocket _socket;
         private readonly ConcurrentDictionary<string, Func<string, CancellationToken, Task>> _handlers;
         private readonly TimeSpan _reconnectDelay;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly JsonSerializerOptions _serializerOptions;
         private bool _channelsRegistered;
+        private ClientWebSocket _socket;
 
         protected sealed record WebSocketChannelActionDescriptor(string EventName, Type ChannelType, MethodInfo MethodInfo);
 
@@ -78,7 +77,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Registrar channels automaticamente na primeira execução
             if (!_channelsRegistered)
             {
                 RegisterChannels();

@@ -8,8 +8,4 @@
     <Title>Web.Api.Toolkit.Entity.Domain</Title>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Folder Include="NovaPasta\" />
-  </ItemGroup>
-
 </Project>

@@ -51,129 +51,20 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             );
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            // Cria a primeira instância lógica
-            CreateNewInstance();
-
-            // Background task para limpar convites expirados E instâncias vazias
-            _ = Task.Run(async () =>
-            {
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-                    CleanExpiredInvites();
-                    CleanIdleInstances();
-                }
-            }, stoppingToken);
-
-            _logger.LogInformation("WebSocket Orchestrator iniciado (IIS Compatible)");
-
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
-
-        /// <summary>
-        /// Método principal para aceitar conexão WebSocket do ASP.NET Core.
-        /// Este método deve ser chamado do seu middleware/controller.
-        /// </summary>
-        public async Task AcceptWebSocketAsync(
-            HttpContext httpContext,
-            WebSocket webSocket,
-            CancellationToken cancellationToken = default
-        )
+        public async Task AcceptWebSocketAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
         {
             var client = new WebSocketClient
             {
                 Id = Guid.NewGuid(),
-                Socket = webSocket,
-                Headers = httpContext.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString()),
-                Cookies = httpContext.Request.Cookies.ToDictionary(c => c.Key, c => c.Value)
+                Socket = null,
+                HttpContext = httpContext
             };
-
-            _logger.LogInformation(
-                "Accepted WebSocket connection. ClientId={ClientId}, RemoteIp={RemoteIp}",
-                client.Id,
-                httpContext.Connection.RemoteIpAddress
-            );
 
             await HandleClientAsync(client, cancellationToken);
         }
 
-        protected virtual ValidateInviteTokenResult ValidateInviteToken(string token)
-        {
-            // ✅ Apenas valida, SEM criar invite novo
-            if (!_pendingInvites.TryGetValue(token, out var invite))
-            {
-                _logger.LogWarning("ValidateInviteToken: token not found: {Token}", token);
-                return new ValidateInviteTokenResult(false, "Token not found.", null);
-            }
-
-            if (invite.IsUsed)
-            {
-                _logger.LogWarning("ValidateInviteToken: token already used: {Token}", token);
-                return new ValidateInviteTokenResult(false, $"Token already used: \"{token}\".", null);
-            }
-
-            if (DateTime.UtcNow > invite.ExpiresAt)
-            {
-                _pendingInvites.TryRemove(token, out _);
-                _logger.LogWarning("ValidateInviteToken: token expired and removed: {Token}", token);
-
-                return new ValidateInviteTokenResult(false, $"Token expired: \"{token}\".", null);
-            }
-
-            _logger.LogDebug("ValidateInviteToken: token valid: {Token}", token);
-            return new ValidateInviteTokenResult(true, null, invite);
-        }
-
-        protected virtual WebSocketAuthResponse Authentication(Dictionary<string, string> headers, Dictionary<string, string> cookies)
-        {
-            var token = "";
-
-            if (headers.ContainsKey("x-token-invite"))
-            {
-                token = headers["x-token-invite"];
-                _logger.LogDebug("Authentication: found token in x-token-invite header");
-            }
-
-            if (cookies.ContainsKey("x-token-invite"))
-            {
-                token = cookies["x-token-invite"];
-                _logger.LogDebug("Authentication: found token in x-token-invite cookie");
-            }
-
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogWarning(
-                    "Authentication: failed to find token in headers or cookies. HeadersContainsToken={HasToken}, CookiesContainToken={HasTokenCookie}",
-                    headers.ContainsKey("x-token-invite"),
-                    cookies.ContainsKey("x-token-invite")
-                );
-
-                return new WebSocketAuthResponse
-                {
-                    Success = false,
-                    Message = "Authentication error: No token found",
-                    Token = token
-                };
-            }
-
-            _logger.LogInformation(
-                "Authentication: successful with token from {Source}",
-                headers.ContainsKey("x-token-invite") ? "x-token-invite header" : "x-token-invite cookie"
-            );
-
-            return new WebSocketAuthResponse
-            {
-                Success = true,
-                Message = "Authentication successful",
-                Token = token
-            };
-        }
-
         public virtual async Task SendAsync(Guid clientId, WebSocketRequest payload)
         {
-            // ✅ O(1) lookup com mapa global
             if (!_clientMap.TryGetValue(clientId, out var tuple))
             {
                 _logger.LogWarning("SendAsync: client {ClientId} not found.", clientId);
@@ -191,7 +82,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             try
             {
-                // ✅ ArrayBufferWriter cria seu próprio buffer interno (não precisa ArrayPool aqui)
                 var bufferWriter = new ArrayBufferWriter<byte>();
 
                 using (var writer = new Utf8JsonWriter(bufferWriter))
@@ -342,13 +232,123 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 Instances = _instances.Values.Select(i => new
                 {
                     i.InstanceId,
-                    Port = 0, // Não há mais portas dedicadas - instâncias são lógicas
+                    Port = 0, 
                     CurrentConnections = i.Clients.Count,
                     i.MaxConnections,
                     i.IsActive,
                     i.CreatedAt
                 })
             };
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            this.CreateNewInstance();
+
+            _ = Task.Run(async () =>
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                    this.CleanExpiredInvites();
+                    this.CleanIdleInstances();
+                }
+            }, stoppingToken);
+
+            _logger.LogInformation("WebSocket Orchestrator iniciado (IIS Compatible)");
+
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+        
+        protected virtual ValidateInviteTokenResult ValidateInviteToken(string token)
+        {
+            if (!_pendingInvites.TryGetValue(token, out var invite))
+            {
+                _logger.LogWarning("ValidateInviteToken: token not found: {Token}", token);
+            
+                return new ValidateInviteTokenResult(false, "Token not found.", null);
+            }
+
+            if (invite.IsUsed)
+            {
+                _logger.LogWarning("ValidateInviteToken: token already used: {Token}", token);
+                
+                return new ValidateInviteTokenResult(false, $"Token already used: \"{token}\".", null);
+            }
+
+            if (DateTime.UtcNow > invite.ExpiresAt)
+            {
+                _pendingInvites.TryRemove(token, out _);
+               
+                _logger.LogWarning("ValidateInviteToken: token expired and removed: {Token}", token);
+
+                return new ValidateInviteTokenResult(false, $"Token expired: \"{token}\".", null);
+            }
+
+            _logger.LogDebug("ValidateInviteToken: token valid: {Token}", token);
+            
+            return new ValidateInviteTokenResult(true, null, invite);
+        }
+
+        protected virtual WebSocketAuthResponse Authentication(WebSocketClient client)
+        {
+            var token = "";
+
+            if (client.HttpContext.Request.Headers.ContainsKey("x-token-invite"))
+            {
+                token = client.HttpContext.Request.Headers["x-token-invite"];
+                _logger.LogDebug("Authentication: found token in x-token-invite header");
+            }
+
+            if (client.HttpContext.Request.Cookies.ContainsKey("x-token-invite"))
+            {
+                token = client.HttpContext.Request.Cookies["x-token-invite"];
+                _logger.LogDebug("Authentication: found token in x-token-invite cookie");
+            }
+
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning(
+                    "Authentication: failed to find token in headers or cookies. HeadersContainsToken={HasToken}, CookiesContainToken={HasTokenCookie}",
+                    client.HttpContext.Request.Headers.ContainsKey("x-token-invite"),
+                    client.HttpContext.Request.Cookies.ContainsKey("x-token-invite")
+                );
+
+                return new WebSocketAuthResponse
+                {
+                    Success = false,
+                    Message = "Authentication error: No token found",
+                    Token = token
+                };
+            }
+
+            _logger.LogInformation(
+                "Authentication: successful with token from {Source}",
+                client.HttpContext.Request.Headers.ContainsKey("x-token-invite") ? "x-token-invite header" : "x-token-invite cookie"
+            );
+
+            return new WebSocketAuthResponse
+            {
+                Success = true,
+                Message = "Authentication successful",
+                Token = token
+            };
+        }
+
+        protected virtual Task OnMessageReceived(WebSocketClient client, string message)
+        {
+            _logger.LogDebug("Message received from client {ClientId}: {Message}", client.Id, message);
+            return Task.CompletedTask;
+        }
+
+        protected virtual Task OnClientConnectedAsync(WebSocketClient client)
+        {
+            return Task.CompletedTask;
+        }
+
+        protected virtual Task OnClientDisconnectedAsync(WebSocketClient client)
+        {
+            return Task.CompletedTask;
         }
 
         private WebSocketInstance CreateNewInstance()
@@ -378,82 +378,53 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         private async Task HandleClientAsync(WebSocketClient client, CancellationToken cancellationToken)
         {
-            // ✅ Buffer do pool - reutilizável
             var buffer = _bufferPool.Rent(4 * 1024);
 
             try
             {
-                // Autenticação
-                var authResponse = Authentication(client.Headers, client.Cookies);
+                var authResponse = Authentication(client);
 
                 if (!authResponse.Success)
-                {
-                    await client.Socket.CloseAsync(
-                        WebSocketCloseStatus.PolicyViolation,
-                        authResponse.Message,
-                        cancellationToken
-                    );
+                {   
                     return;
                 }
 
-                // Validação do token de convite
                 var validateInviteToken = ValidateInviteToken(authResponse.Token);
 
                 if (!validateInviteToken.Valid)
-                {
-                    await client.Socket.CloseAsync(
-                        WebSocketCloseStatus.PolicyViolation,
-                        validateInviteToken.Message,
-                        cancellationToken
-                    );
+                {   
                     return;
                 }
 
-                // Encontra a instância correta
                 if (!_instances.TryGetValue(validateInviteToken.Invite.InstanceId, out var instance))
                 {
-                    await client.Socket.CloseAsync(
-                        WebSocketCloseStatus.InternalServerError,
-                        "Instance not found",
-                        cancellationToken
-                    );
                     return;
                 }
 
-                // Adiciona o cliente à instância E ao mapa global
-                instance.Clients[client.Id] = client;
-                _clientMap[client.Id] = (client, instance);
-
-                // Marca o convite como usado
                 if (_pendingInvites.TryGetValue(validateInviteToken.Invite.Token, out var invite))
                 {
                     invite.IsUsed = true;
                 }
 
-                _logger.LogInformation(
-                    "Client {ClientId} connected to instance {InstanceId}. CurrentConnections={Connections}",
-                    client.Id,
-                    instance.InstanceId,
-                    instance.Clients.Count
-                );
+                client.Socket = await client.HttpContext.WebSockets.AcceptWebSocketAsync();
+                instance.Clients[client.Id] = client;
+                _clientMap[client.Id] = (client, instance);
 
-                // Chama o hook para classes derivadas
                 await OnClientConnectedAsync(client);
 
-                // ✅ ArrayBufferWriter reutilizável ao invés de MemoryStream
                 var messageBuffer = new ArrayBufferWriter<byte>();
 
-                // Loop de recebimento de mensagens
                 while (client.Socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
                 {
                     messageBuffer.Clear();
+
                     WebSocketReceiveResult result;
                     int totalBytesRead = 0;
 
                     do
                     {
                         result = await client.Socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
-                        
+
                         if (result.Count > 0)
                         {
                             messageBuffer.Write(buffer.AsSpan(0, result.Count));
@@ -467,11 +438,11 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                         break;
                     }
 
-                    // Hook para processar mensagens recebidas
                     if (result.MessageType == WebSocketMessageType.Text && totalBytesRead > 0)
                     {
-                        // ✅ Decodifica direto do buffer sem ToArray()
+                        
                         var message = Encoding.UTF8.GetString(messageBuffer.WrittenSpan);
+                        
                         await OnMessageReceived(client, message);
                     }
                 }
@@ -486,15 +457,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             }
             finally
             {
-                // ✅ Devolve buffer ao pool
                 _bufferPool.Return(buffer);
 
-                // ✅ Remove do mapa global E recupera a instância correta
                 if (_clientMap.TryRemove(client.Id, out var tuple))
                 {
                     var instance = tuple.Instance;
-                    
-                    // Remove da instância
+
                     instance.Clients.TryRemove(client.Id, out _);
 
                     _logger.LogInformation(
@@ -504,11 +472,9 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                         instance.Clients.Count
                     );
 
-                    // Chama o hook para classes derivadas
                     await OnClientDisconnectedAsync(client);
                 }
 
-                // Fecha a conexão se ainda estiver aberta
                 if (client.Socket.State == WebSocketState.Open)
                 {
                     try
@@ -524,31 +490,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                 client.Socket.Dispose();
             }
-        }
-
-        /// <summary>
-        /// Override este método para processar mensagens recebidas dos clientes
-        /// </summary>
-        protected virtual Task OnMessageReceived(WebSocketClient client, string message)
-        {
-            _logger.LogDebug("Message received from client {ClientId}: {Message}", client.Id, message);
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Override este método para ser notificado quando um cliente conectar
-        /// </summary>
-        protected virtual Task OnClientConnectedAsync(WebSocketClient client)
-        {
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Override este método para ser notificado quando um cliente desconectar
-        /// </summary>
-        protected virtual Task OnClientDisconnectedAsync(WebSocketClient client)
-        {
-            return Task.CompletedTask;
         }
 
         private void CleanExpiredInvites()
@@ -568,17 +509,16 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         private void CleanIdleInstances()
         {
-            // Remove instâncias lógicas vazias e ociosas (exceto a primeira)
             var idleThreshold = TimeSpan.FromMinutes(10);
             var instancesToRemove = new List<string>();
 
             foreach (var instance in _instances.Values)
             {
-                // Mantém pelo menos 1 instância sempre ativa
                 if (_instances.Count <= 1)
+                {
                     break;
+                }
 
-                // Se vazia e antiga
                 if (instance.Clients.Count == 0 && 
                     DateTime.UtcNow - instance.CreatedAt > idleThreshold)
                 {
@@ -591,6 +531,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 if (_instances.TryRemove(instanceId, out var removedInstance))
                 {
                     removedInstance.IsActive = false;
+
                     _logger.LogInformation(
                         "Removed idle instance {InstanceId}. Age={Age} minutes",
                         instanceId,
