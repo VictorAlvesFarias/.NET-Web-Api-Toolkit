@@ -25,23 +25,26 @@ namespace Web.Api.Toolkit.Ws.Application.Extensions
             return services;
         }
 
-        public static IApplicationBuilder UseWebSocketEndpoint<T>(this IApplicationBuilder app) where T : WebSocketWorker
+        public static IApplicationBuilder UseWebSocketEndpoint<T>(this IApplicationBuilder app, string path = "/ws") where T : WebSocketWorker
         {
-            app.Use(async (context, next) =>
+            app.Map(path, builder =>
             {
-                if (context.WebSockets.IsWebSocketRequest)
+                builder.Use(async (context, next) =>
                 {
-                    var serviceProvider = context.RequestServices.GetRequiredService<T>();
+                    if (context.WebSockets.IsWebSocketRequest)
+                    {
+                        var serviceProvider = context.RequestServices.GetRequiredService<T>();
 
-                    await serviceProvider.AcceptWebSocketAsync(
-                        context,
-                        context.RequestAborted
-                    );
+                        await serviceProvider.AcceptWebSocketAsync(
+                            context,
+                            context.RequestAborted
+                        );
 
-                    return;
-                }
+                        return;
+                    }
 
-                await next();
+                    await next();
+                });
             });
 
             return app;
