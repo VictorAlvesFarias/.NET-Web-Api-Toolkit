@@ -25,6 +25,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         private readonly TimeSpan _reconnectDelay;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly JsonSerializerOptions _serializerOptions;
+        private bool _reconect;
         private bool _channelsRegistered;
         private ClientWebSocket _socket;
 
@@ -54,6 +55,21 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             var bytes = Encoding.UTF8.GetBytes(json);
 
             await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token);
+        }
+
+        public Task Reconect()
+        {
+            _reconect = true;
+
+            try
+            {
+                _socket?.Abort();
+            }
+            catch
+            {
+            }
+
+            return Task.CompletedTask;
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken)
@@ -112,7 +128,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                     await OnDisconnectedAsync();
 
-                    await Task.Delay(GetReconnectDelay(), stoppingToken);
+                    if (!_reconect)
+                    {
+                        await Task.Delay(GetReconnectDelay(), stoppingToken);
+                    }
+
+                    _reconect = false;
                 }
             }
         }
