@@ -126,7 +126,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 {
                     _logger.LogWarning(ex, "Erro na conexão WS, reconectando em {0}s...", GetReconnectDelay().TotalSeconds);
 
-                    await OnDisconnectedAsync();
+                    await OnDisconnectedAsync(ex);
 
                     if (!_reconect)
                     {
@@ -168,11 +168,11 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             return Task.CompletedTask;
         }
 
-        protected virtual Task OnDisconnectedAsync()
+        protected virtual Task OnDisconnectedAsync(Exception exception)
         {
             return Task.CompletedTask;
         }
-
+        
         protected virtual void ProcessMessage(string message, CancellationToken token)
         {
             try
