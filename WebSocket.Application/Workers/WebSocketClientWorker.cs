@@ -20,16 +20,17 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 {
     public class WebSocketClientWorker : BackgroundService
     {
+        protected sealed record WebSocketChannelActionDescriptor(string EventName, Type ChannelType, MethodInfo MethodInfo);
+        
         private readonly ILogger<WebSocketClientWorker> _logger;
         private readonly ConcurrentDictionary<string, Func<string, CancellationToken, Task>> _handlers;
         private readonly TimeSpan _reconnectDelay;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly JsonSerializerOptions _serializerOptions;
-        private bool _reconect;
         private bool _channelsRegistered;
         private ClientWebSocket _socket;
-
-        protected sealed record WebSocketChannelActionDescriptor(string EventName, Type ChannelType, MethodInfo MethodInfo);
+        
+        protected bool ReconectRequest { get; set; }
 
         public WebSocketClientWorker(ILogger<WebSocketClientWorker> logger, IServiceScopeFactory scopeFactory, TimeSpan? reconnectDelay = null)
         {
@@ -59,7 +60,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         public Task Reconect()
         {
-            _reconect = true;
+            ReconectRequest = true;
 
             try
             {
@@ -128,12 +129,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                     await OnDisconnectedAsync(ex);
 
-                    if (!_reconect)
+                    if (!ReconectRequest)
                     {
                         await Task.Delay(GetReconnectDelay(), stoppingToken);
                     }
 
-                    _reconect = false;
+                    ReconectRequest = false;
                 }
             }
         }
