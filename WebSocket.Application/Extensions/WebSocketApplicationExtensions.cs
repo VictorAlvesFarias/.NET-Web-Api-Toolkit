@@ -11,14 +11,13 @@ namespace Web.Api.Toolkit.Ws.Application.Extensions
     {
         public static IServiceCollection AddWebSocketWorker(
             this IServiceCollection services,
-            int maxConnectionsPerInstance = 100,
-            int inviteExpirationMinutes = 5
+            int maxConnectionsPerInstance = 100
         )
         {
             services.AddSingleton(sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<WebSocketWorker>>();
-                return new WebSocketWorker(logger, maxConnectionsPerInstance, inviteExpirationMinutes);
+                return new WebSocketWorker(logger, maxConnectionsPerInstance);
             });
 
             services.AddHostedService(sp => sp.GetRequiredService<WebSocketWorker>());
