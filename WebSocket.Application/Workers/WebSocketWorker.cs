@@ -36,7 +36,72 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             );
         }
 
-        public async Task AcceptWebSocketAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
+
+        #region Utilitaries 
+
+        public ConcurrentDictionary<Guid, WebSocketClient> GetClients()
+        {
+            // ✅ Usa mapa global direto - muito mais rápido
+            var allClients = new ConcurrentDictionary<Guid, WebSocketClient>();
+
+            foreach (var kvp in _clientMap)
+            {
+                if (kvp.Value.Instance.IsActive)
+                {
+                    allClients.TryAdd(kvp.Key, kvp.Value.Client);
+                }
+            }
+
+            return allClients;
+        }
+
+        public WebSocketInstanceStatistics GetStatistics()
+        {
+            return new WebSocketInstanceStatistics
+            {
+                TotalInstances = _instances.Count,
+                ActiveInstances = _instances.Values.Count(i => i.IsActive),
+                TotalClients = _instances.SelectMany(e => e.Value.Clients).Count(),
+                PendingInvites = 0,
+                Instances = _instances.Values.Select(i => new
+                {
+                    i.InstanceId,
+                    Port = 0,
+                    CurrentConnections = i.Clients.Count,
+                    i.MaxConnections,
+                    i.IsActive,
+                    i.CreatedAt
+                })
+            };
+        }
+
+        #endregion
+
+        #region Background Service Methods
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            this.CreateNewInstance();
+
+            _ = Task.Run(async () =>
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+                    this.CleanIdleInstances();
+                }
+            }, stoppingToken);
+
+            _logger.LogInformation("WebSocket Orchestrator iniciado (IIS Compatible)");
+
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+
+        #endregion
+
+        #region Virtual Methods
+
+        public virtual async Task AcceptWebSocketAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
         {
             var client = new WebSocketClient
             {
@@ -145,64 +210,10 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 _logger.LogDebug("BroadcastAsync: sent to {Count} clients. Event={Event}, Bytes={Bytes}", clientCount, payload?.Event, bytesWritten);
             }
         }
-
-        public ConcurrentDictionary<Guid, WebSocketClient> GetClients()
-        {
-            // ✅ Usa mapa global direto - muito mais rápido
-            var allClients = new ConcurrentDictionary<Guid, WebSocketClient>();
-
-            foreach (var kvp in _clientMap)
-            {
-                if (kvp.Value.Instance.IsActive)
-                {
-                    allClients.TryAdd(kvp.Key, kvp.Value.Client);
-                }
-            }
-
-            return allClients;
-        }
-
-        public string GetWebSocketUrl()
+        
+        protected virtual async Task<string> GetUrlAsync()
         {
             return "/ws";
-        }
-
-        public WebSocketInstanceStatistics GetStatistics()
-        {
-            return new WebSocketInstanceStatistics
-            {
-                TotalInstances = _instances.Count,
-                ActiveInstances = _instances.Values.Count(i => i.IsActive),
-                TotalClients = _instances.SelectMany(e => e.Value.Clients).Count(),
-                PendingInvites = 0,
-                Instances = _instances.Values.Select(i => new
-                {
-                    i.InstanceId,
-                    Port = 0, 
-                    CurrentConnections = i.Clients.Count,
-                    i.MaxConnections,
-                    i.IsActive,
-                    i.CreatedAt
-                })
-            };
-        }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            this.CreateNewInstance();
-
-            _ = Task.Run(async () =>
-            {
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-                    this.CleanIdleInstances();
-                }
-            }, stoppingToken);
-
-            _logger.LogInformation("WebSocket Orchestrator iniciado (IIS Compatible)");
-
-            await Task.Delay(Timeout.Infinite, stoppingToken);
         }
         
         protected virtual WebSocketAuthResponse Authentication(WebSocketClient client)
@@ -215,7 +226,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 Message = "Authentication successful"
             };
         }
-
+        
         protected virtual Task OnMessageReceived(WebSocketClient client, string message)
         {
             _logger.LogDebug("Message received from client {ClientId}: {Message}", client.Id, message);
@@ -232,6 +243,10 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             return Task.CompletedTask;
         }
 
+        #endregion
+
+        #region Helpers 
+        
         private WebSocketInstance CreateNewInstance()
         {
             var instanceId = Guid.NewGuid().ToString();
@@ -383,7 +398,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     break;
                 }
 
-                if (instance.Clients.Count == 0 && 
+                if (instance.Clients.Count == 0 &&
                     DateTime.UtcNow - instance.CreatedAt > idleThreshold)
                 {
                     instancesToRemove.Add(instance.InstanceId);
@@ -404,5 +419,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 }
             }
         }
+
+        #endregion
     }
 }
