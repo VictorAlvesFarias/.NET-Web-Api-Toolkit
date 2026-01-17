@@ -7,6 +7,6 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/VictorAlvesFarias/.NET-Web-Basics</RepositoryUrl>
     <PackageOutputPath>$(SolutionDir)\bin\Packages</PackageOutputPath>
-    <Version>1.0.35</Version>
+    <Version>1.0.36</Version>
    </PropertyGroup>
 </Project>

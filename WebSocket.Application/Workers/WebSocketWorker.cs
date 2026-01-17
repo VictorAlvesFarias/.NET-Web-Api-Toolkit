@@ -12,42 +12,27 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     using global::Web.Api.Toolkit.Ws.Application.Dtos;
     using System;
 
-    /// <summary>
-    /// WebSocketWorker - IIS Compatible Version (Performance Optimized)
-    /// ✅ Funciona no IIS / Azure App Service / Cloud
-    /// ✅ Um único endpoint WebSocket com multiplexação lógica
-    /// ✅ Mantém 100% da lógica de invite/instance/authentication
-    /// ✅ Instâncias são conceitos lógicos, não portas físicas
-    /// ✅ ArrayPool para reduzir alocações
-    /// ✅ Mapa global de clientes para lookup O(1)
-    /// ✅ Serialização JSON otimizada
-    /// </summary>
     public class WebSocketWorker : BackgroundService
     {
         private readonly ILogger<WebSocketWorker> _logger;
         private readonly ConcurrentDictionary<string, WebSocketInstance> _instances;
-        private readonly ConcurrentDictionary<string, ConnectionInvite> _pendingInvites;
         private readonly ConcurrentDictionary<Guid, (WebSocketClient Client, WebSocketInstance Instance)> _clientMap;
         private readonly int _maxConnectionsPerInstance;
-        private readonly int _inviteExpirationMinutes;
         private static readonly ArrayPool<byte> _bufferPool = ArrayPool<byte>.Shared;
 
         public WebSocketWorker(
             ILogger<WebSocketWorker> logger,
-            int maxConnectionsPerInstance = 100,
-            int inviteExpirationMinutes = 5
+            int maxConnectionsPerInstance = 100
         )
         {
             _logger = logger;
             _instances = new ConcurrentDictionary<string, WebSocketInstance>();
-            _pendingInvites = new ConcurrentDictionary<string, ConnectionInvite>();
             _clientMap = new ConcurrentDictionary<Guid, (WebSocketClient, WebSocketInstance)>();
             _maxConnectionsPerInstance = maxConnectionsPerInstance;
-            _inviteExpirationMinutes = inviteExpirationMinutes;
 
             _logger.LogInformation(
-                "WebSocketWorker constructed (IIS Compatible + Optimized): maxConnectionsPerInstance={MaxConnections}, inviteExpirationMinutes={InviteMinutes}",
-                _maxConnectionsPerInstance, _inviteExpirationMinutes
+                "WebSocketWorker constructed (IIS Compatible + Optimized): maxConnectionsPerInstance={MaxConnections}",
+                _maxConnectionsPerInstance
             );
         }
 
@@ -91,7 +76,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                 var bytesWritten = bufferWriter.WrittenCount;
 
-                // ✅ Envia direto do WrittenMemory sem ToArray()
                 await client.Socket.SendAsync(
                     bufferWriter.WrittenMemory.Slice(0, bytesWritten),
                     WebSocketMessageType.Text,
@@ -109,20 +93,15 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
         public virtual async Task BroadcastAsync(WebSocketRequest payload, Func<WebSocketClient, WebSocketRequest, bool>? q = null)
         {
-            // ✅ Serializa uma vez só
             var bufferWriter = new ArrayBufferWriter<byte>();
+
             using (var writer = new Utf8JsonWriter(bufferWriter))
             {
                 JsonSerializer.Serialize(writer, payload);
             }
+
             var sharedBuffer = bufferWriter.WrittenMemory;
             var bytesWritten = bufferWriter.WrittenCount;
-
-            // ✅ Envia sequencial - WebSocket já é async, não precisa Task.Run
-            // ⚠️ NOTA: Em escala extrema (10k+ clientes), considerar:
-            //    - Channel<T> com workers dedicados
-            //    - SemaphoreSlim(32) para paralelismo controlado
-            //    - Fila por instância para evitar head-of-line blocking
             var clientCount = 0;
             var errors = 0;
 
@@ -183,42 +162,9 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             return allClients;
         }
 
-        public ConnectionInfo GetAvailableInstance(Guid clientId)
+        public string GetWebSocketUrl()
         {
-            CleanExpiredInvites();
-
-            var availableInstance = _instances.Values
-                .Where(i => i.IsActive && i.Clients.Count < i.MaxConnections)
-                .OrderBy(i => i.Clients.Count)
-                .FirstOrDefault();
-
-            if (availableInstance == null)
-            {
-                availableInstance = CreateNewInstance();
-            }
-
-            var token = Guid.NewGuid().ToString();
-            var invite = new ConnectionInvite
-            {
-                Token = token,
-                InstanceId = availableInstance.InstanceId,
-                ClientId = clientId,
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(_inviteExpirationMinutes),
-                IsUsed = false
-            };
-
-            _pendingInvites[token] = invite;
-
-            _logger.LogInformation("Invite generated for client {ClientId} on instance {InstanceId}. Token={Token}, ExpiresAt={ExpiresAt}",
-                clientId, availableInstance.InstanceId, token, invite.ExpiresAt);
-
-            return new ConnectionInfo
-            {
-                Url = availableInstance.Url,
-                Token = token,
-                ExpiresAt = invite.ExpiresAt
-            };
+            return "/ws";
         }
 
         public WebSocketInstanceStatistics GetStatistics()
@@ -228,7 +174,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 TotalInstances = _instances.Count,
                 ActiveInstances = _instances.Values.Count(i => i.IsActive),
                 TotalClients = _instances.SelectMany(e => e.Value.Clients).Count(),
-                PendingInvites = _pendingInvites.Count,
+                PendingInvites = 0,
                 Instances = _instances.Values.Select(i => new
                 {
                     i.InstanceId,
@@ -250,7 +196,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-                    this.CleanExpiredInvites();
                     this.CleanIdleInstances();
                 }
             }, stoppingToken);
@@ -260,78 +205,14 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
         
-        protected virtual ValidateInviteTokenResult ValidateInviteToken(string token)
-        {
-            if (!_pendingInvites.TryGetValue(token, out var invite))
-            {
-                _logger.LogWarning("ValidateInviteToken: token not found: {Token}", token);
-            
-                return new ValidateInviteTokenResult(false, "Token not found.", null);
-            }
-
-            if (invite.IsUsed)
-            {
-                _logger.LogWarning("ValidateInviteToken: token already used: {Token}", token);
-                
-                return new ValidateInviteTokenResult(false, $"Token already used: \"{token}\".", null);
-            }
-
-            if (DateTime.UtcNow > invite.ExpiresAt)
-            {
-                _pendingInvites.TryRemove(token, out _);
-               
-                _logger.LogWarning("ValidateInviteToken: token expired and removed: {Token}", token);
-
-                return new ValidateInviteTokenResult(false, $"Token expired: \"{token}\".", null);
-            }
-
-            _logger.LogDebug("ValidateInviteToken: token valid: {Token}", token);
-            
-            return new ValidateInviteTokenResult(true, null, invite);
-        }
-
         protected virtual WebSocketAuthResponse Authentication(WebSocketClient client)
         {
-            var token = "";
-
-            if (client.HttpContext.Request.Headers.ContainsKey("x-token-invite"))
-            {
-                token = client.HttpContext.Request.Headers["x-token-invite"];
-                _logger.LogDebug("Authentication: found token in x-token-invite header");
-            }
-
-            if (client.HttpContext.Request.Cookies.ContainsKey("x-token-invite"))
-            {
-                token = client.HttpContext.Request.Cookies["x-token-invite"];
-                _logger.LogDebug("Authentication: found token in x-token-invite cookie");
-            }
-
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogWarning(
-                    "Authentication: failed to find token in headers or cookies. HeadersContainsToken={HasToken}, CookiesContainToken={HasTokenCookie}",
-                    client.HttpContext.Request.Headers.ContainsKey("x-token-invite"),
-                    client.HttpContext.Request.Cookies.ContainsKey("x-token-invite")
-                );
-
-                return new WebSocketAuthResponse
-                {
-                    Success = false,
-                    Message = "Authentication error: No token found",
-                    Token = token
-                };
-            }
-
-            _logger.LogInformation(
-                "Authentication: successful with token from {Source}",
-                client.HttpContext.Request.Headers.ContainsKey("x-token-invite") ? "x-token-invite header" : "x-token-invite cookie"
-            );
+            _logger.LogDebug("Authentication: client {ClientId} connecting", client.Id);
 
             return new WebSocketAuthResponse
             {
                 Success = true,
-                Message = "Authentication successful",
-                Token = token
+                Message = "Authentication successful"
             };
         }
 
@@ -386,25 +267,23 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                 if (!authResponse.Success)
                 {   
+                    _logger.LogWarning("Client {ClientId} authentication failed: {Message}", client.Id, authResponse.Message);
                     return;
                 }
 
-                var validateInviteToken = ValidateInviteToken(authResponse.Token);
+                // Seleciona automaticamente a instância com menos conexões
+                var instance = _instances.Values
+                    .Where(i => i.IsActive && i.Clients.Count < i.MaxConnections)
+                    .OrderBy(i => i.Clients.Count)
+                    .FirstOrDefault();
 
-                if (!validateInviteToken.Valid)
-                {   
-                    return;
-                }
-
-                if (!_instances.TryGetValue(validateInviteToken.Invite.InstanceId, out var instance))
+                // Se não houver instância disponível, cria uma nova
+                if (instance == null)
                 {
-                    return;
+                    instance = CreateNewInstance();
                 }
 
-                if (_pendingInvites.TryGetValue(validateInviteToken.Invite.Token, out var invite))
-                {
-                    invite.IsUsed = true;
-                }
+                _logger.LogInformation("Client {ClientId} assigned to instance {InstanceId}", client.Id, instance.InstanceId);
 
                 client.Socket = await client.HttpContext.WebSockets.AcceptWebSocketAsync();
                 instance.Clients[client.Id] = client;
@@ -489,21 +368,6 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 }
 
                 client.Socket.Dispose();
-            }
-        }
-
-        private void CleanExpiredInvites()
-        {
-            var expiredTokens = _pendingInvites.Where(kv => DateTime.UtcNow > kv.Value.ExpiresAt).Select(kv => kv.Key).ToList();
-
-            foreach (var token in expiredTokens)
-            {
-                _pendingInvites.TryRemove(token, out _);
-            }
-
-            if (expiredTokens.Any())
-            {
-                _logger.LogInformation("Removidos {Count} convites expirados", expiredTokens.Count);
             }
         }
 
