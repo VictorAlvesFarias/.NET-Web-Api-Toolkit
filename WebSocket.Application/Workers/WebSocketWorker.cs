@@ -369,20 +369,23 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     await OnClientDisconnectedAsync(client);
                 }
 
-                if (client.Socket.State == WebSocketState.Open)
+                if (client.Socket is not null)
                 {
-                    try
+                    if (client.Socket.State == WebSocketState.Open)
                     {
-                        await client.Socket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Closed by server",
-                            CancellationToken.None
-                        );
+                        try
+                        {
+                            await client.Socket.CloseAsync(
+                                WebSocketCloseStatus.NormalClosure,
+                                "Closed by server",
+                                CancellationToken.None
+                            );
+                        }
+                        catch { }
                     }
-                    catch { }
-                }
 
-                client.Socket.Dispose();
+                    client.Socket.Dispose();
+                }
             }
         }
 
