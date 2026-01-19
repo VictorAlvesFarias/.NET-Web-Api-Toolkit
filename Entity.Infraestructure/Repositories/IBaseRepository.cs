@@ -3,6 +3,7 @@
     public interface IBaseRepository<TEntity> : IBaseRepositoryOperations<TEntity> where TEntity : class
     {
         BaseRepositoryWrapper<TEntity> IgnoreMediator<TMediator>();
+        BaseRepositoryWrapper<TEntity> IgnoreMediator(Type mediatorType);
         Task<TEntity> AddAsync(TEntity entity, IReadOnlyCollection<Type> ignoreMediators);
         bool Remove(TEntity item, IReadOnlyCollection<Type> ignoreMediators);
         bool Remove(int id, IReadOnlyCollection<Type> ignoreMediators);
