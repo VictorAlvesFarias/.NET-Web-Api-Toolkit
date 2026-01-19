@@ -4,7 +4,7 @@ using Web.Api.Toolkit.Entity.Infraestructure.Mediators;
 
 namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
 {
-    public class BaseRepository<TEntity> : IBaseRepository<TEntity>, IBaseRepositoryOperations<TEntity> where TEntity : class
+    public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : class
     {
         private readonly DbSet<TEntity> _entity;
         private readonly DbContext _context;
