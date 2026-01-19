@@ -2,12 +2,20 @@
 {
     public interface IBaseRepository<TEntity> where TEntity : class
     {
+        BaseRepositoryWrapper<TEntity> IgnoreMediator<TMediator>();
+        Task<TEntity> AddAsync(TEntity entity, IReadOnlyCollection<Type> ignoreMediators);
+        bool Remove(TEntity item, IReadOnlyCollection<Type> ignoreMediators);
+        bool Remove(int id, IReadOnlyCollection<Type> ignoreMediators);
+        bool Update(TEntity entity, IReadOnlyCollection<Type> ignoreMediators);
+        IQueryable<TEntity> Get(IReadOnlyCollection<Type> ignoreMediators);
+    }
+
+    public interface IBaseRepositoryOperations<TEntity> where TEntity : class
+    {
         Task<TEntity> AddAsync(TEntity entity);
         bool Remove(TEntity item);
         bool Remove(int id);
         bool Update(TEntity entity);
-        TEntity GetById(int id);
         IQueryable<TEntity> Get();
-        IQueryable<TEntity> Get(bool ignoreUserId);
     }
 }
