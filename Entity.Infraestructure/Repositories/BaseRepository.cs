@@ -10,7 +10,10 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
         private readonly DbContext _context;
         private readonly IEnumerable<IDatabaseContextMediator<TEntity>> _mediators;
 
-        public BaseRepository(IDatabaseContextFactory dbContextFactory, IEnumerable<IDatabaseContextMediator<TEntity>> mediators)
+        public BaseRepository(
+            IDatabaseContextFactory dbContextFactory,
+            IEnumerable<IDatabaseContextMediator<TEntity>> mediators
+        )
         {
             _mediators = mediators ?? Enumerable.Empty<IDatabaseContextMediator<TEntity>>();
             _context = dbContextFactory.CreateDbContext<TEntity>();
@@ -19,9 +22,14 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
 
         public BaseRepositoryWrapper<TEntity> IgnoreMediator<TMediator>()
         {
+            return IgnoreMediator(typeof(TMediator));
+        }
+
+        public BaseRepositoryWrapper<TEntity> IgnoreMediator(Type mediatorType)
+        {
             return new BaseRepositoryWrapper<TEntity>(
                 this,
-                new[] { typeof(TMediator) }
+                new[] { mediatorType }
             );
         }
 
@@ -29,19 +37,18 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
         {
             return await AddAsync(entity, Array.Empty<Type>());
         }
-        
+
         public async Task<TEntity> AddAsync(TEntity entity, IReadOnlyCollection<Type> ignoredMediators)
         {
             foreach (var mediator in _mediators)
             {
-                if (ignoredMediators.Contains(mediator.GetType()))
+                if (ShouldIgnore(mediator.GetType(), ignoredMediators))
                     continue;
 
                 mediator.Handle(entity, _context);
             }
 
             var result = await _entity.AddAsync(entity);
-            
             await _context.SaveChangesAsync();
 
             return result.Entity;
@@ -51,12 +58,12 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
         {
             return Remove(item, Array.Empty<Type>());
         }
-        
-        public bool Remove(TEntity item, IReadOnlyCollection<Type> ignoredMediators)
+
+        public bool Remove(TEntity item, IReadOnlyCollection<Type> ignoredMediators )
         {
             foreach (var mediator in _mediators)
             {
-                if (ignoredMediators.Contains(mediator.GetType()))
+                if (ShouldIgnore(mediator.GetType(), ignoredMediators))
                     continue;
 
                 mediator.Handle(item, _context);
@@ -72,19 +79,17 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
         {
             return Remove(id, Array.Empty<Type>());
         }
-        
-        public bool Remove(int id, IReadOnlyCollection<Type> ignoredMediators)
+
+        public bool Remove(int id,  IReadOnlyCollection<Type> ignoredMediators)
         {
             var entity = _entity.Find(id);
 
             if (entity == null)
-            {
                 return false;
-            }
 
             foreach (var mediator in _mediators)
             {
-                if (ignoredMediators.Contains(mediator.GetType()))
+                if (ShouldIgnore(mediator.GetType(), ignoredMediators))
                     continue;
 
                 mediator.Handle(entity, _context);
@@ -100,12 +105,12 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
         {
             return Update(entity, Array.Empty<Type>());
         }
-        
+
         public bool Update(TEntity entity, IReadOnlyCollection<Type> ignoredMediators)
         {
             foreach (var mediator in _mediators)
             {
-                if (ignoredMediators.Contains(mediator.GetType()))
+                if (ShouldIgnore(mediator.GetType(), ignoredMediators))
                     continue;
 
                 mediator.Handle(entity, _context);
@@ -128,7 +133,7 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
 
             foreach (var mediator in _mediators)
             {
-                if (ignoredMediators.Contains(mediator.GetType()))
+                if (ShouldIgnore(mediator.GetType(), ignoredMediators))
                     continue;
 
                 query = mediator.Handle(query, _context);
@@ -137,14 +142,37 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
             return query;
         }
 
+        private static bool ShouldIgnore(Type mediatorType, IReadOnlyCollection<Type> ignoredMediators
+        )
+        {
+            foreach (var ignored in ignoredMediators)
+            {
+                if (ignored.IsGenericTypeDefinition)
+                {
+                    if (mediatorType
+                        .GetInterfaces()
+                        .Any(i =>
+                            i.IsGenericType &&
+                            i.GetGenericTypeDefinition() == ignored
+                        ))
+                        return true;
+                }
+                else if (ignored.IsAssignableFrom(mediatorType))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
-    public class BaseRepositoryWrapper<TEntity> where TEntity : class 
+
+    public class BaseRepositoryWrapper<TEntity> where TEntity : class
     {
         private readonly BaseRepository<TEntity> _repository;
         private readonly HashSet<Type> _ignoredMediators;
 
-        public BaseRepositoryWrapper
-        (
+        public BaseRepositoryWrapper(
             BaseRepository<TEntity> repository,
             IEnumerable<Type> ignoredMediators
         )
@@ -155,8 +183,12 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
 
         public BaseRepositoryWrapper<TEntity> IgnoreMediator<TMediator>()
         {
-            _ignoredMediators.Add(typeof(TMediator));
+            return IgnoreMediator(typeof(TMediator));
+        }
 
+        public BaseRepositoryWrapper<TEntity> IgnoreMediator(Type mediatorType)
+        {
+            _ignoredMediators.Add(mediatorType);
             return this;
         }
 
