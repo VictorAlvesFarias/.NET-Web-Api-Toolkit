@@ -1,8 +1,7 @@
 ﻿namespace Web.Api.Toolkit.Helpers.Application.Dtos
 {
-    public class BaseResponse<T>
+    public class BaseResponse
     {
-        public T? Data { get; set; }
         public bool Success { get; set; }
         public List<ErrorMessage> Errors { get; set; } = new List<ErrorMessage>();
         public List<ErrorMessage> Exceptions { get; set; } = new List<ErrorMessage>();
@@ -31,8 +30,10 @@
         }
     }
 
-    public class BaseResponse : BaseResponse<string>
+    public class BaseResponse<T> : BaseResponse
     {
         public BaseResponse(bool success = true) : base(success) { }
+
+        public T? Data { get; set; }
     }
 }

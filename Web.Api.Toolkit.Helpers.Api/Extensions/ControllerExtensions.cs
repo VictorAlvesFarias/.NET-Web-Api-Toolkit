@@ -7,7 +7,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
 {
     public static class ControllerExtensions
     {
-        public static ActionResult<BaseResponse<T>> Result<T>(this ControllerBase controller, BaseResponse<T> result)
+        public static ActionResult<BaseResponse> Result(this ControllerBase controller, BaseResponse result)
         {
             try
             {
@@ -35,6 +35,11 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
                     Exceptions = new List<ErrorMessage> { new ErrorMessage(ex.Message) }
                 });
             }
+        }
+
+        public static ActionResult<BaseResponse<T>> Result<T>(this ControllerBase controller, BaseResponse<T> result)
+        {
+            return controller.Result(result);
         }
     }
 }
