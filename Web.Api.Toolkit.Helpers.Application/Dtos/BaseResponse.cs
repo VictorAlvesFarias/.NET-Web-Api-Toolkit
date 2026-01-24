@@ -1,9 +1,14 @@
 ﻿namespace Web.Api.Toolkit.Helpers.Application.Dtos
 {
-    public class DataResponse
+    public class BaseResponse<T>
     {
+        public T? Data { get; set; }
+        public bool Success { get; set; }
         public List<ErrorMessage> Errors { get; set; } = new List<ErrorMessage>();
         public List<ErrorMessage> Exceptions { get; set; } = new List<ErrorMessage>();
+
+        public BaseResponse(bool success = true) => Success = success;
+
         public void AddError(ErrorMessage error)
         {
             Errors.Add(error);
@@ -24,6 +29,10 @@
             Exceptions.AddRange(errors);
             Success = false;
         }
-        public bool Success { get; set; }
+    }
+
+    public class BaseResponse : BaseResponse<string>
+    {
+        public BaseResponse(bool success = true) : base(success) { }
     }
 }

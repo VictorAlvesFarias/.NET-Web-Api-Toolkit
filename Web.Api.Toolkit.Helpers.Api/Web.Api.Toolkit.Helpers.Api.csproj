@@ -14,8 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Helpers.Application\Web.Api.Toolkit.Helpers.Application.csproj" />
-    <ProjectReference Include="..\Helpers.Domain\Web.Api.Toolkit.Helpers.Domain.csproj" />
+    <ProjectReference Include="..\Web.Api.Toolkit.Helpers.Application\Web.Api.Toolkit.Helpers.Application.csproj" />
+    <ProjectReference Include="..\Web.Api.Toolkit.Helpers.Domain\Web.Api.Toolkit.Helpers.Domain.csproj" />
   </ItemGroup>
 	
 </Project>

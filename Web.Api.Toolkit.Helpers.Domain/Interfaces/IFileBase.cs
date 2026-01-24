@@ -3,6 +3,7 @@
     public interface IFileBase
     {
         byte[] Bytes { get; set; }
+        string Name { get; set; }
         string MimeType { get; set; }
     }
 }
