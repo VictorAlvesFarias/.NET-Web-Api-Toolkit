@@ -142,27 +142,26 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
             return query;
         }
 
-        private static bool ShouldIgnore(Type mediatorType, IReadOnlyCollection<Type> ignoredMediators
-        )
+        private static bool ShouldIgnore(Type mediatorType, IReadOnlyCollection<Type> ignoredMediators)
         {
-            foreach (var ignored in ignoredMediators)
+            foreach (Type ignored in ignoredMediators)
             {
                 if (ignored.IsGenericTypeDefinition)
                 {
-                    if (mediatorType
-                        .GetInterfaces()
-                        .Any(i =>
-                            i.IsGenericType &&
-                            i.GetGenericTypeDefinition() == ignored
-                        ))
-                        return true;
+                    Type current = mediatorType;
+                    while (current != null)
+                    {
+                        if (current.IsGenericType && current.GetGenericTypeDefinition() == ignored)
+                            return true;
+
+                        current = current.BaseType;
+                    }
                 }
                 else if (ignored.IsAssignableFrom(mediatorType))
                 {
                     return true;
                 }
             }
-
             return false;
         }
     }
