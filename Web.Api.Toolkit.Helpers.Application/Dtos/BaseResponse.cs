@@ -10,16 +10,22 @@
 
         public void AddError(ErrorMessage error)
         {
+            Success = false;
+
             Errors.Add(error);
         }
 
         public void AddErrors(List<ErrorMessage> errors)
         {
+            Success = false;
+
             Errors.AddRange(errors);
         }
 
         public void AddException(ErrorMessage error)
         {
+            Success = false;
+
             Errors.Add(error);
         }
     }
