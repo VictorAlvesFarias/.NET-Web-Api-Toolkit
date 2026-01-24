@@ -2,7 +2,7 @@
 {
     public class BaseResponse
     {
-        public BaseResponse() { }
+        public BaseResponse() { Success = true; }
         public BaseResponse(bool success) { Success = success; }
 
         public bool Success { get; set; }
@@ -26,7 +26,7 @@
 
     public class BaseResponse<T> : BaseResponse
     {
-        public BaseResponse() { }
+        public BaseResponse() { Success = true; }
         public BaseResponse(bool success) : base(success) { }
 
         public T Data { get; set; }
