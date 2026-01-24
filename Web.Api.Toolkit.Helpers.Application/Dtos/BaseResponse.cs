@@ -13,6 +13,11 @@
             Errors.Add(error);
         }
 
+        public void AddErrors(List<ErrorMessage> errors)
+        {
+            Errors.AddRange(errors);
+        }
+
         public void AddException(ErrorMessage error)
         {
             Errors.Add(error);
