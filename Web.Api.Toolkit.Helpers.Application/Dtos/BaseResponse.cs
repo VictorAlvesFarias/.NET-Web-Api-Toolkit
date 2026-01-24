@@ -2,6 +2,9 @@
 {
     public class BaseResponse
     {
+        public BaseResponse() { }
+        public BaseResponse(bool success) { Success = success; }
+
         public bool Success { get; set; }
         public List<ErrorMessage> Errors { get; set; } = new List<ErrorMessage>();
 
@@ -12,13 +15,15 @@
 
         public void AddException(ErrorMessage error)
         {
-            // Sua lógica de exceção aqui
             Errors.Add(error);
         }
     }
 
     public class BaseResponse<T> : BaseResponse
     {
+        public BaseResponse() { }
+        public BaseResponse(bool success) : base(success) { }
+
         public T Data { get; set; }
     }
 }
