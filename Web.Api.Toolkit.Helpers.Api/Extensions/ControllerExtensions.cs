@@ -19,7 +19,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
                     return controller.StatusCode(result.Errors.First().StatusCode, result);
                 }
 
-                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse<IEnumerable<T>>
+                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse()
                 {
                     Success = false,
                     Errors = new List<ErrorMessage> { new ErrorMessage("Ocorreu um erro interno no servidor") }
@@ -27,7 +27,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
             }
             catch (Exception ex)
             {
-                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse<IEnumerable<T>>
+                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse()
                 {
                     Success = false,
                     Errors = new List<ErrorMessage> { new ErrorMessage("Ocorreu um erro interno no servidor") },
