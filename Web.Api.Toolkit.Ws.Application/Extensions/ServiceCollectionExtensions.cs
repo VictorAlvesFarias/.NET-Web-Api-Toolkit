@@ -8,7 +8,7 @@ namespace Web.Api.Toolkit.Ws.Application.Extensions
 {
     public static class ServiceCollectionExtensions
     {
-        public static IServiceCollection AddWebSocketChannels<TWorker>(this IServiceCollection services)  where TWorker : WebSocketClientWorker
+        public static IServiceCollection AddWebSocketChannels<TWorker>(this IServiceCollection services) where TWorker : WebSocketClientWorker
         {
             return AddWebSocketChannels<TWorker>(services, ServiceLifetime.Scoped);
         }
@@ -43,8 +43,8 @@ namespace Web.Api.Toolkit.Ws.Application.Extensions
                         return Array.Empty<Type>();
                     }
                 })
-                .Where(t => baseChannelType.IsAssignableFrom(t) 
-                    && !t.IsAbstract 
+                .Where(t => baseChannelType.IsAssignableFrom(t)
+                    && !t.IsAbstract
                     && !t.IsInterface
                     && t.IsClass)
                 .Distinct()

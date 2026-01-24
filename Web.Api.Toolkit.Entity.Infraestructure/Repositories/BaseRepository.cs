@@ -59,7 +59,7 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
             return Remove(item, Array.Empty<Type>());
         }
 
-        public bool Remove(TEntity item, IReadOnlyCollection<Type> ignoredMediators )
+        public bool Remove(TEntity item, IReadOnlyCollection<Type> ignoredMediators)
         {
             foreach (var mediator in _mediators)
             {
@@ -80,7 +80,7 @@ namespace Web.Api.Toolkit.Entity.Infraestructure.Repositories
             return Remove(id, Array.Empty<Type>());
         }
 
-        public bool Remove(int id,  IReadOnlyCollection<Type> ignoredMediators)
+        public bool Remove(int id, IReadOnlyCollection<Type> ignoredMediators)
         {
             var entity = _entity.Find(id);
 

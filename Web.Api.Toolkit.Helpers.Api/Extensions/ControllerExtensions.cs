@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Web.Api.Toolkit.Helpers.Application.Dtos;
-using Web.Api.Toolkit.Helpers.Domain.Interfaces;
 
 namespace Web.Api.Toolkit.Helpers.Api.Extensions
 {
@@ -20,7 +19,7 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
                     return controller.StatusCode(result.Errors.First().StatusCode, result);
                 }
 
-                return controller.StatusCode(StatusCodes.Status500InternalServerError,new BaseResponse<IEnumerable<T>>
+                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse<IEnumerable<T>>
                 {
                     Success = false,
                     Errors = new List<ErrorMessage> { new ErrorMessage("Ocorreu um erro interno no servidor") }

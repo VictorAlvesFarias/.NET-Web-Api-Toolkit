@@ -1,4 +1,3 @@
-using System;
 using Web.Api.Toolkit.Ws.Application.Contexts;
 using Web.Api.Toolkit.Ws.Application.Workers;
 

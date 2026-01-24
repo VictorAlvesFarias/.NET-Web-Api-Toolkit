@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Net.WebSockets;
 using Web.Api.Toolkit.Ws.Application.Workers;
 
 namespace Web.Api.Toolkit.Ws.Application.Extensions

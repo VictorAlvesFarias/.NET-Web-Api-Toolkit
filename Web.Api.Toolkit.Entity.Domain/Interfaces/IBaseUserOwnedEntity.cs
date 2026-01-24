@@ -1,4 +1,4 @@
-﻿namespace Web.Api.Toolkit.Helpers.Domain.Interfaces
+﻿namespace Web.Api.Toolkit.Entity.Domain.Interfaces
 {
     public interface IBaseUserOwnedEntity<TUser> : IBaseEntity
     {

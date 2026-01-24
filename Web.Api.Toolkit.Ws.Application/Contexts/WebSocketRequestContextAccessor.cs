@@ -1,5 +1,3 @@
-using System.Threading;
-
 namespace Web.Api.Toolkit.Ws.Application.Contexts
 {
     public class WebSocketRequestContextAccessor : IWebSocketRequestContextAccessor

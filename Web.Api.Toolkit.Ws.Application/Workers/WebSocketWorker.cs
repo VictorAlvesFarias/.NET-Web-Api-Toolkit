@@ -210,12 +210,12 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 _logger.LogDebug("BroadcastAsync: sent to {Count} clients. Event={Event}, Bytes={Bytes}", clientCount, payload?.Event, bytesWritten);
             }
         }
-        
+
         protected virtual async Task<string> GetUrlAsync()
         {
             return "/ws";
         }
-        
+
         protected virtual WebSocketAuthResponse Authentication(WebSocketClient client)
         {
             _logger.LogDebug("Authentication: client {ClientId} connecting", client.Id);
@@ -226,7 +226,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 Message = "Authentication successful"
             };
         }
-        
+
         protected virtual Task OnMessageReceived(WebSocketClient client, string message)
         {
             _logger.LogDebug("Message received from client {ClientId}: {Message}", client.Id, message);
@@ -246,7 +246,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         #endregion
 
         #region Helpers 
-        
+
         private WebSocketInstance CreateNewInstance()
         {
             var instanceId = Guid.NewGuid().ToString();
@@ -281,7 +281,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 var authResponse = Authentication(client);
 
                 if (!authResponse.Success)
-                {   
+                {
                     _logger.LogWarning("Client {ClientId} authentication failed: {Message}", client.Id, authResponse.Message);
                     return;
                 }
@@ -334,9 +334,9 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
                     if (result.MessageType == WebSocketMessageType.Text && totalBytesRead > 0)
                     {
-                        
+
                         var message = Encoding.UTF8.GetString(messageBuffer.WrittenSpan);
-                        
+
                         await OnMessageReceived(client, message);
                     }
                 }

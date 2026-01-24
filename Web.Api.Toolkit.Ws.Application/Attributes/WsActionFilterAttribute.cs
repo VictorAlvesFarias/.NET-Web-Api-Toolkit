@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Web.Api.Toolkit.Ws.Application.Contexts;
 
 namespace Web.Api.Toolkit.Ws.Application.Attributes
@@ -9,7 +7,7 @@ namespace Web.Api.Toolkit.Ws.Application.Attributes
     {
         public int Order { get; set; }
 
-        public async virtual Task OnActionExecutingAsync(WebSocketRequestContext context) 
+        public async virtual Task OnActionExecutingAsync(WebSocketRequestContext context)
         {
             return;
         }

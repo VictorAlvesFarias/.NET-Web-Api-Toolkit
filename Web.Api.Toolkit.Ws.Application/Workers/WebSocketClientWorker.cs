@@ -1,14 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
 using System.Reflection;
-using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
 using Web.Api.Toolkit.Ws.Application.Attributes;
@@ -21,7 +17,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
     public class WebSocketClientWorker : BackgroundService
     {
         protected sealed record WebSocketChannelActionDescriptor(string EventName, Type ChannelType, MethodInfo MethodInfo);
-        
+
         private readonly ILogger<WebSocketClientWorker> _logger;
         private readonly ConcurrentDictionary<string, Func<string, CancellationToken, Task>> _handlers;
         private readonly TimeSpan _reconnectDelay;
@@ -29,7 +25,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         private readonly JsonSerializerOptions _serializerOptions;
         private bool _channelsRegistered;
         private ClientWebSocket _socket;
-        
+
         protected bool ReconectRequest { get; set; }
 
         public WebSocketClientWorker(ILogger<WebSocketClientWorker> logger, IServiceScopeFactory scopeFactory, TimeSpan? reconnectDelay = null)
@@ -157,7 +153,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         protected virtual CookieContainer GetCookies()
         {
             return new();
-        }   
+        }
 
         protected virtual TimeSpan GetReconnectDelay()
         {
@@ -173,7 +169,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
         {
             return Task.CompletedTask;
         }
-        
+
         protected virtual void ProcessMessage(string message, CancellationToken token)
         {
             try
@@ -209,7 +205,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             // Primeiro, deserializar o envelope completo da mensagem
             using var envelope = JsonSerializer.Deserialize<JsonDocument>(context.Request, _serializerOptions);
-            
+
             if (envelope == null)
             {
                 return args;
@@ -233,7 +229,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error deserializing parameter {ParameterName} of type {ParameterType}", 
+                    _logger.LogError(ex, "Error deserializing parameter {ParameterName} of type {ParameterType}",
                         parameter.Name, parameter.ParameterType.Name);
                 }
             }
@@ -300,7 +296,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
 
             var thisWorkerType = GetType();
             var expectedBaseType = typeof(WebSocketChannelBase<>).MakeGenericType(thisWorkerType);
-            
+
             if (!expectedBaseType.IsAssignableFrom(channelType))
             {
                 throw new ArgumentException($"Channel type must inherit from {expectedBaseType.FullName}<{thisWorkerType.Name}>", nameof(channelType));
@@ -389,7 +385,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
             }
 
             var filters = GetFilters(descriptor);
-            
+
             foreach (var filter in filters)
             {
                 try
@@ -409,7 +405,7 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                     context.Error = true;
 
                     await filter.OnActionExecuted(context);
-                    
+
                     return;
                 }
             }
@@ -448,25 +444,25 @@ namespace Web.Api.Toolkit.Ws.Application.Workers
                 }
             }
         }
-        
+
         private List<WsActionFilterAttribute> GetFilters(WebSocketChannelActionDescriptor descriptor)
         {
             var filters = new List<WsActionFilterAttribute>();
-            
+
             // Filtros da classe
             var classFilters = descriptor.ChannelType
                 .GetCustomAttributes<WsActionFilterAttribute>(true)
                 .Cast<WsActionFilterAttribute>();
-            
+
             filters.AddRange(classFilters);
-            
+
             // Filtros do método
             var methodFilters = descriptor.MethodInfo
                 .GetCustomAttributes<WsActionFilterAttribute>(true)
                 .Cast<WsActionFilterAttribute>();
-            
+
             filters.AddRange(methodFilters);
-            
+
             // Ordenar por Order
             return filters
                 .OrderBy(f => f is WsActionFilterAttribute attr ? attr.Order : 0)

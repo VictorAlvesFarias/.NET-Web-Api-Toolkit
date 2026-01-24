@@ -1,10 +1,11 @@
-﻿using Web.Api.Toolkit.Helpers.Domain.Interfaces;
+﻿using Web.Api.Toolkit.Entity.Domain.Interfaces;
 
 namespace Web.Api.Toolkit.Entity.Domain.Entities
 {
     public class BaseEntity : IBaseEntity
     {
-        public BaseEntity() {
+        public BaseEntity()
+        {
             CreateDate = DateTime.UtcNow;
             UpdateDate = DateTime.UtcNow;
         }
