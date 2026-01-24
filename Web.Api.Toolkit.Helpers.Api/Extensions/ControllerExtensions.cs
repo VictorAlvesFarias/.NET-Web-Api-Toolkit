@@ -6,39 +6,31 @@ namespace Web.Api.Toolkit.Helpers.Api.Extensions
 {
     public static class ControllerExtensions
     {
-        public static ActionResult<BaseResponse> Result(this ControllerBase controller, BaseResponse result)
+        public static ActionResult<TResponse> Result<TResponse>(this ControllerBase controller, TResponse result) where TResponse : BaseResponse, new()
         {
             try
             {
+                if (!result.Success && !result.Errors.Any())
+                {
+                    result.AddError(new ErrorMessage("Ocorreu um erro interno no servidor", StatusCodes.Status500InternalServerError));
+                }
+
                 if (result.Success)
                 {
                     return controller.Ok(result);
                 }
-                else if (result.Errors.Count > 0)
-                {
-                    return controller.StatusCode(result.Errors.First().StatusCode, result);
-                }
 
-                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse()
-                {
-                    Success = false,
-                    Errors = new List<ErrorMessage> { new ErrorMessage("Ocorreu um erro interno no servidor") }
-                });
+                return controller.StatusCode(result.Errors.First().StatusCode, result);
             }
             catch (Exception ex)
             {
-                return controller.StatusCode(StatusCodes.Status500InternalServerError, new BaseResponse()
-                {
-                    Success = false,
-                    Errors = new List<ErrorMessage> { new ErrorMessage("Ocorreu um erro interno no servidor") },
-                    Exceptions = new List<ErrorMessage> { new ErrorMessage(ex.Message) }
-                });
-            }
-        }
+                var errorResponse = new TResponse();
 
-        public static ActionResult<BaseResponse<T>> Result<T>(this ControllerBase controller, BaseResponse<T> result)
-        {
-            return controller.Result(result);
+                errorResponse.AddError(new ErrorMessage("Ocorreu um erro interno no servidor", StatusCodes.Status500InternalServerError));
+                errorResponse.AddException(new ErrorMessage(ex.Message));
+
+                return controller.StatusCode(StatusCodes.Status500InternalServerError, errorResponse);
+            }
         }
     }
 }
